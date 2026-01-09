@@ -386,16 +386,28 @@ while [ $# -gt 0 ]; do
             ;;
         -*)
             OPTS=${1#-}
+            COMP_SET_IN_THIS_ARG=false
             while [ -n "$OPTS" ]; do
-                case "$OPTS" in
-                    g*) COMP_TYPE=gzip ;;
-                    l*) COMP_TYPE=lz4 ;;
-                    x*) COMP_TYPE=xz ;;
-                    z*) COMP_TYPE=zstd ;;
-                    b*)
+                OPT_CHAR="${OPTS:0:1}"
+                case "$OPT_CHAR" in
+                    g|l|x|z)
+                        if [ "$COMP_SET_IN_THIS_ARG" = true ]; then
+                            echo "ERROR: Multiple compression types specified in same option group"
+                            echo "Use only one of: -g, -l, -x, -z"
+                            exit 1
+                        fi
+                        case "$OPT_CHAR" in
+                            g) COMP_TYPE=gzip ;;
+                            l) COMP_TYPE=lz4 ;;
+                            x) COMP_TYPE=xz ;;
+                            z) COMP_TYPE=zstd ;;
+                        esac
+                        COMP_SET_IN_THIS_ARG=true
+                        ;;
+                    b)
                         BACKUP_ORIG=false
                         ;;
-                    m*)
+                    m)
                         SKIP_MD5=true
                         ;;
                     *)
