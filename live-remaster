@@ -66,7 +66,7 @@ du_size() {
 # Function to get compression type of squashfs
 sqfs_comp_type() {
     local file=$1
-    comp_num=$(dd if="$file" bs=1 skip=20 count=2 status=none 2>/dev/null | od -An -tdI)
+    comp_num=$(dd if="$file" bs=1 skip=20 count=2 status=none 2>/dev/null | od -An -tu2)
     case $comp_num in
         1) echo gzip ;;
         2) echo lzma ;;
