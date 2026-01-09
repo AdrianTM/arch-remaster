@@ -13,6 +13,11 @@ SAFETY_MARGIN=20
 BACKUP_ORIG=
 SKIP_MD5=false
 
+# Check for root privileges and self-elevate if needed
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
+
 # Trap for cleanup
 cleanup() {
     if [ "$BOOT_MP" != "/run/archiso/bootmnt" ]; then
