@@ -101,7 +101,11 @@ main() {
         # Ask about backup preference only if file exists and backup flag not set
         if [ -z "$BACKUP_ORIG" ]; then
             while true; do
-                read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE
+                if ! read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE; then
+                    echo "EOF detected, defaulting to no backup."
+                    BACKUP_ORIG=false
+                    break
+                fi
                 case "$BACKUP_CHOICE" in
                     ""|y|Y)
                         BACKUP_ORIG=true
