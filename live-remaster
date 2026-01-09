@@ -90,9 +90,33 @@ remount_rw() {
     fi
 }
 
+# Function to check for required dependencies
+check_dependencies() {
+    local missing=""
+
+    # Check for mksquashfs
+    if ! command -v mksquashfs >/dev/null 2>&1; then
+        missing="$missing mksquashfs"
+    fi
+
+    # Check for md5sum (only if not skipped)
+    if [ "$SKIP_MD5" = false ] && ! command -v md5sum >/dev/null 2>&1; then
+        missing="$missing md5sum"
+    fi
+
+    if [ -n "$missing" ]; then
+        echo "ERROR: Missing required tools:$missing"
+        echo "Please install the required packages and try again."
+        exit 1
+    fi
+}
+
 # Main function
 main() {
     echo "Arch Live Remaster v$VERSION"
+
+    # Check dependencies
+    check_dependencies
 
     # Excludes: runtime mounts and cache
     excludes="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
