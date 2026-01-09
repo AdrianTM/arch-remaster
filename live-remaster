@@ -9,6 +9,10 @@ COMP_TYPE="zstd"
 # Safety margin
 SAFETY_MARGIN=20
 
+# Default settings
+BACKUP_ORIG=
+SKIP_MD5=false
+
 # Trap for cleanup
 cleanup() {
     if [ "$BOOT_MP" != "/run/archiso/bootmnt" ]; then
@@ -67,23 +71,25 @@ main() {
         SKIP_MOUNT=true
         ORIG_EXISTS=true
         echo "Found live file at $BOOT_MP/arch/x86_64/airootfs.sfs"
-        # Ask about backup preference only if file exists
-        while true; do
-            read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE
-            case "$BACKUP_CHOICE" in
-                ""|y|Y)
-                    BACKUP_ORIG=true
-                    break
-                    ;;
-                n|N)
-                    BACKUP_ORIG=false
-                    break
-                    ;;
-                *)
-                    echo "Please answer 'y' or 'n'"
-                    ;;
-            esac
-        done
+        # Ask about backup preference only if file exists and backup flag not set
+        if [ -z "$BACKUP_ORIG" ]; then
+            while true; do
+                read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE
+                case "$BACKUP_CHOICE" in
+                    ""|y|Y)
+                        BACKUP_ORIG=true
+                        break
+                        ;;
+                    n|N)
+                        BACKUP_ORIG=false
+                        break
+                        ;;
+                    *)
+                        echo "Please answer 'y' or 'n'"
+                        ;;
+                esac
+            done
+        fi
     else
         echo "Live file not found at $BOOT_MP/arch/x86_64/airootfs.sfs"
         SKIP_MOUNT=false
@@ -239,8 +245,10 @@ main() {
     mv "$tmp_file" "$new_file"
 
     # Update md5
-    echo "Calculating MD5 checksum..."
-    md5sum "$new_file" > "$new_file.md5"
+    if [ "$SKIP_MD5" = false ]; then
+        echo "Calculating MD5 checksum..."
+        md5sum "$new_file" > "$new_file.md5"
+    fi
 
     sq_new_size=$(du_size "$new_file")
     echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
@@ -268,8 +276,10 @@ main() {
             fi
             echo "Replacing with new airootfs.sfs..."
             mv "$new_file" "$SQFILE_FULL"
-            echo "Updating MD5..."
-            md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
+            if [ "$SKIP_MD5" = false ]; then
+                echo "Updating MD5..."
+                md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
+            fi
             if [ "$BOOT_MP" != "/" ]; then
                 echo "Remounting $BOOT_MP RO..."
                 mount -o remount,ro "$BOOT_MP"
@@ -290,9 +300,41 @@ while [ $# -gt 0 ]; do
             COMP_TYPE="$2"
             shift 2
             ;;
+        --no-backup)
+            BACKUP_ORIG=false
+            shift
+            ;;
+        --no-md5sum)
+            SKIP_MD5=true
+            shift
+            ;;
+        -*)
+            OPTS=${1#-}
+            while [ -n "$OPTS" ]; do
+                case "$OPTS" in
+                    g*) COMP_TYPE=gzip ;;
+                    l*) COMP_TYPE=lz4 ;;
+                    x*) COMP_TYPE=xz ;;
+                    z*) COMP_TYPE=zstd ;;
+                    b*)
+                        BACKUP_ORIG=false
+                        ;;
+                    m*)
+                        SKIP_MD5=true
+                        ;;
+                    *)
+                        echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum]"
+                        echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
+                        exit 1
+                        ;;
+                esac
+                OPTS=${OPTS#?}
+            done
+            shift
+            ;;
         *)
-            echo "Usage: $0 [-c|--comp compression_type]"
-            echo "Supported compression: gzip, lz4, xz, zstd"
+            echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum]"
+            echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
             exit 1
             ;;
     esac
