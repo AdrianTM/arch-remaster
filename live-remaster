@@ -1,0 +1,314 @@
+#!/bin/bash
+
+# Arch Live Remaster
+# Adapted from antiX live-remaster for Arch Linux
+
+# Default compression
+COMP_TYPE="zstd"
+
+# Safety margin
+SAFETY_MARGIN=20
+
+# Trap for cleanup
+cleanup() {
+    if [ "$BOOT_MP" != "/run/archiso/bootmnt" ]; then
+        umount "$BOOT_MP" 2>/dev/null
+        rm -rf "$BOOT_MP"
+    fi
+    rm -rf "/tmp/remaster.exclude"
+}
+trap cleanup EXIT
+
+# Function to get size in MiB
+fmt_size() {
+    local size=$1
+    echo "$size MiB"
+}
+
+# Function to get free space in MiB
+free_space() {
+    df -BM "$1" | awk 'NR==2 {print $4}' | sed 's/M$//' | awk '{print int($1)}'
+}
+
+# Function to get total space in MiB
+all_space() {
+    df -BM "$1" | awk 'NR==2 {print $2}' | sed 's/M$//' | awk '{print int($1)}'
+}
+
+# Function to get du size in MiB
+du_size() {
+    du -sm "$1" 2>/dev/null | awk '{print int($1)}' || echo 0
+}
+
+# Function to get compression type of squashfs
+sqfs_comp_type() {
+    local file=$1
+    comp_num=$(dd if="$file" bs=1 skip=20 count=2 status=none 2>/dev/null | od -An -tdI)
+    case $comp_num in
+        1) echo gzip ;;
+        2) echo lzma ;;
+        3) echo lzo ;;
+        4) echo xz ;;
+        5) echo lz4 ;;
+        6) echo zstd ;;
+        *) echo unknown ;;
+    esac
+}
+
+# Main function
+main() {
+    echo "Arch Live Remaster"
+
+    # Set boot mount point
+    BOOT_MP="/run/archiso/bootmnt"
+
+    # Check if boot device is already mounted at the expected location
+    if [ -f "$BOOT_MP/arch/x86_64/airootfs.sfs" ]; then
+        SKIP_MOUNT=true
+        ORIG_EXISTS=true
+        echo "Found live file at $BOOT_MP/arch/x86_64/airootfs.sfs"
+        # Ask about backup preference only if file exists
+        while true; do
+            read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE
+            case "$BACKUP_CHOICE" in
+                ""|y|Y)
+                    BACKUP_ORIG=true
+                    break
+                    ;;
+                n|N)
+                    BACKUP_ORIG=false
+                    break
+                    ;;
+                *)
+                    echo "Please answer 'y' or 'n'"
+                    ;;
+            esac
+        done
+    else
+        echo "Live file not found at $BOOT_MP/arch/x86_64/airootfs.sfs"
+        SKIP_MOUNT=false
+        ORIG_EXISTS=false
+        BACKUP_ORIG=false
+
+        if grep -q 'archisodevice=' /proc/cmdline; then
+            BOOT_DEV=$(grep -o 'archisodevice=[^ ]*' /proc/cmdline | cut -d= -f2)
+            echo "Found archisodevice from cmdline: $BOOT_DEV"
+        else
+            echo "No boot device found from /proc/cmdline"
+            echo "Mount your boot device to $BOOT_MP and run again, or set archisodevice= in kernel cmdline"
+            exit 1
+        fi
+    fi
+
+    # Handle mounting
+    if [ "$SKIP_MOUNT" != true ]; then
+        if [ -n "$BOOT_DEV" ]; then
+            # Create mount point directory
+            mkdir -p "$BOOT_MP"
+            echo "Attempting to mount $BOOT_DEV to $BOOT_MP"
+            mount "$BOOT_DEV" "$BOOT_MP" || { echo "Cannot mount boot device $BOOT_DEV"; exit 1; }
+            echo "Mounted boot device at $BOOT_MP"
+        fi
+    else
+        # Already mounted, try to remount RW
+        if mount -o remount,rw "$BOOT_MP" 2>/dev/null; then
+            RW_SUCCESS=true
+            echo "Remounted $BOOT_MP RW"
+        else
+            RW_SUCCESS=false
+            echo "RW remount failed for $BOOT_MP"
+        fi
+    fi
+
+    # Path to airootfs
+    SQFILE_DIR="$BOOT_MP/arch/x86_64"
+    SQFILE_FULL="$SQFILE_DIR/airootfs.sfs"
+    OUTPUT_DIR="$SQFILE_DIR"
+
+    # Ensure output directory exists
+    mkdir -p "$SQFILE_DIR"
+
+    # Check if device is writable
+    if [ "$SKIP_MOUNT" != true ]; then
+        # We just mounted it, so it should be writable
+        RW_SUCCESS=true
+        if ! touch "$BOOT_MP/test" 2>/dev/null || ! rm "$BOOT_MP/test" 2>/dev/null; then
+            echo "ERROR: Boot device is not writable"
+            exit 1
+        fi
+    elif [ "$RW_SUCCESS" = false ]; then
+        # Already mounted, try to remount RW if needed
+        if mount -o remount,rw "$BOOT_MP" 2>/dev/null; then
+            RW_SUCCESS=true
+            echo "Remounted $BOOT_MP RW"
+        else
+            echo "ERROR: Boot device is read-only and cannot be remounted"
+            echo "Please remount the device as read-write and run again"
+            exit 1
+        fi
+    fi
+
+    # Get sizes
+    fs_new_size=$(du_size /)
+
+    if [ "$ORIG_EXISTS" = true ]; then
+        sq_old_size=$(du_size "$SQFILE_FULL")
+        echo "Original airootfs size: $(fmt_size $sq_old_size)"
+    else
+        sq_old_size=0
+        echo "No original airootfs to compare"
+    fi
+    echo "Estimated new size: $(fmt_size $fs_new_size)"
+
+    # Compression factor (rough estimate)
+    if [ "$ORIG_EXISTS" = true ]; then
+        old_comp=$(sqfs_comp_type "$SQFILE_FULL")
+    else
+        old_comp="$COMP_TYPE"
+    fi
+    case $old_comp in
+        zstd) factor=37 ;;
+        xz) factor=37 ;;
+        gzip) factor=37 ;;
+        lz4) factor=37 ;;
+        *) factor=37 ;;
+    esac
+
+    sq_new_size_est=$((fs_new_size * factor / 100))
+    safe_estimate=$((sq_new_size_est + SAFETY_MARGIN))
+
+    boot_total=$(all_space "$BOOT_MP")
+    boot_avail=$(free_space "$BOOT_MP")
+
+    echo "Boot device total: $(fmt_size $boot_total)"
+    echo "Boot device free: $(fmt_size $boot_avail)"
+    echo "Estimated new squashfs size: $(fmt_size $sq_new_size_est)"
+
+    if [ $boot_avail -lt $safe_estimate ]; then
+        echo "Not enough space: $boot_avail MiB available, need $safe_estimate MiB"
+        while true; do
+            read -p "Continue anyway? (y/N): " CONTINUE_CHOICE
+            case "$CONTINUE_CHOICE" in
+                y|Y)
+                    break
+                    ;;
+                ""|n|N)
+                    exit 1
+                    ;;
+                *)
+                    echo "Please answer 'y' or 'n'"
+                    ;;
+            esac
+        done
+    fi
+
+    echo "Using compression: $COMP_TYPE"
+
+    # Excludes: runtime mounts and cache
+    excludes="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
+    exclude_size=0
+    for excl in $excludes; do
+        if [ -d "/$excl" ]; then
+            excl_size=$(du_size "/$excl")
+            exclude_size=$((exclude_size + excl_size))
+        fi
+    done
+    # Also calculate size of /run for exclusion
+    if [ -d "/run" ]; then
+        run_size=$(du_size "/run")
+        exclude_size=$((exclude_size + run_size))
+    fi
+    fs_new_size=$((fs_new_size - exclude_size))
+
+    # Create exclude file
+    exclude_file="/tmp/remaster.exclude"
+    printf "%s\n" $excludes > "$exclude_file"
+    # Handle /run specially - exclude contents but keep archiso directory
+    echo "!run/archiso" >> "$exclude_file"
+    echo "run/*" >> "$exclude_file"
+
+    mkdir -p "$OUTPUT_DIR"
+    # Temp file
+    tmp_file="$OUTPUT_DIR/airootfs.sfs.tmp"
+    new_file="$OUTPUT_DIR/airootfs.sfs.new"
+
+    # Ensure /run/archiso directory structure exists in the filesystem
+    # These directories are needed as mount points during boot
+    if [ ! -d "/run/archiso" ]; then
+        mkdir -p /run/archiso
+        echo "Created /run/archiso directory for mount point"
+    fi
+    if [ ! -d "/run/archiso/bootmnt" ]; then
+        mkdir -p /run/archiso/bootmnt
+        echo "Created /run/archiso/bootmnt directory"
+    fi
+
+    # Compression options
+    OTHER_OPTS="-comp $COMP_TYPE"
+
+    # Run mksquashfs
+    echo "Creating new airootfs.sfs... This may take a while."
+    if mksquashfs / "$tmp_file" $OTHER_OPTS -wildcards -ef "$exclude_file"; then
+        echo "mksquashfs succeeded"
+    else
+        echo "mksquashfs failed"
+        rm -f "$tmp_file"
+        exit 1
+    fi
+
+    # Move to new
+    echo "Moving to final file..."
+    mv "$tmp_file" "$new_file"
+
+    # Update md5
+    echo "Calculating MD5 checksum..."
+    md5sum "$new_file" > "$new_file.md5"
+
+    sq_new_size=$(du_size "$new_file")
+    echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
+    echo "To use the new system, run: mv $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+
+    # For live systems, handle replacement based on backup preference
+    if [ "$SKIP_MOUNT" = true ]; then
+        echo "Preparing to replace airootfs.sfs..."
+        if mount -o remount,rw "$BOOT_MP" 2>/dev/null || [ "$BOOT_MP" = "/" ]; then
+            if [ "$BACKUP_ORIG" = true ] && [ "$ORIG_EXISTS" = true ]; then
+                echo "Backing up original airootfs.sfs..."
+                mv "$SQFILE_FULL" "$SQFILE_FULL.old"
+            elif [ "$ORIG_EXISTS" = true ]; then
+                echo "Removing original airootfs.sfs..."
+                rm "$SQFILE_FULL"
+            fi
+            echo "Replacing with new airootfs.sfs..."
+            mv "$new_file" "$SQFILE_FULL"
+            echo "Updating MD5..."
+            md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
+            if [ "$BOOT_MP" != "/" ]; then
+                echo "Remounting $BOOT_MP RO..."
+                mount -o remount,ro "$BOOT_MP"
+            fi
+            echo "Replacement complete. Reboot to test the new system."
+        else
+            echo "ERROR: Failed to remount $BOOT_MP RW for replacement"
+            echo "Please manually replace: cp $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+            exit 1
+        fi
+    fi
+}
+
+# Parse options
+while [ $# -gt 0 ]; do
+    case $1 in
+        -c|--comp)
+            COMP_TYPE="$2"
+            shift 2
+            ;;
+        *)
+            echo "Usage: $0 [-c|--comp compression_type]"
+            echo "Supported compression: gzip, lz4, xz, zstd"
+            exit 1
+            ;;
+    esac
+done
+
+main
