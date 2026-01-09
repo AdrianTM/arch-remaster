@@ -6,6 +6,9 @@
 # Default compression
 COMP_TYPE="zstd"
 
+# Version
+VERSION="26.01"
+
 # Safety margin
 SAFETY_MARGIN=20
 
@@ -89,7 +92,7 @@ remount_rw() {
 
 # Main function
 main() {
-    echo "Arch Live Remaster"
+    echo "Arch Live Remaster v$VERSION"
 
     # Set boot mount point
     BOOT_MP="/run/archiso/bootmnt"
@@ -342,6 +345,10 @@ main() {
 # Parse options
 while [ $# -gt 0 ]; do
     case $1 in
+        -v|--version)
+            echo "Arch Live Remaster v$VERSION"
+            exit 0
+            ;;
         -c|--comp)
             COMP_TYPE="$2"
             shift 2
