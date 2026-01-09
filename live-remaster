@@ -338,6 +338,12 @@ main() {
             if [ "$SKIP_MD5" = false ]; then
                 echo "Updating MD5..."
                 md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
+            else
+                # Remove old MD5 file if it exists to avoid confusion
+                if [ -f "$SQFILE_FULL.md5" ]; then
+                    echo "Removing old MD5 file..."
+                    rm -f "$SQFILE_FULL.md5"
+                fi
             fi
             if [ "$BOOT_MP" != "/" ]; then
                 # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
