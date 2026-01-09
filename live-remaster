@@ -202,7 +202,7 @@ main() {
             # Special handling for /run - include archiso but exclude mounted bootmnt
             if [ "$dir_name" = "run" ]; then
                 # Only count size of run/archiso, not the mount point
-                run_archiso_size=$(du_size "/run/archiso" 2>/dev/null || echo 0)
+                run_archiso_size=$(du_size "/run/archiso")
                 fs_new_size=$((fs_new_size + run_archiso_size))
             else
                 dir_size=$(du_size "/$dir_name")
@@ -238,7 +238,8 @@ main() {
         echo "$excl" >> "$exclude_file"
     done
     # Handle /run specially - preserve archiso directory and exclude everything else in /run
-    # Using negation pattern to ensure /run/archiso is included
+    # Add exclusions for /run - order matters: negations first, then broad exclusions
+    # Using negation patterns to ensure /run/archiso is included despite excluding run/*
     echo "!run/archiso" >> "$exclude_file"
     echo "!run/archiso/*" >> "$exclude_file"
     echo "run/*" >> "$exclude_file"
