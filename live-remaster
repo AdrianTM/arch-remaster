@@ -291,8 +291,15 @@ main() {
                 md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
             fi
             if [ "$BOOT_MP" != "/" ]; then
-                echo "Remounting $BOOT_MP RO..."
-                mount -o remount,ro "$BOOT_MP"
+                # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
+                root_fs=$(df --output=source / | tail -n1)
+                boot_fs=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
+                if [ "$root_fs" != "$boot_fs" ] || [ -z "$boot_fs" ]; then
+                    echo "Remounting $BOOT_MP RO..."
+                    mount -o remount,ro "$BOOT_MP"
+                else
+                    echo "WARNING: Skipping RO remount to avoid locking root filesystem"
+                fi
             fi
             echo "Replacement complete. Reboot to test the new system."
         else
