@@ -148,8 +148,33 @@ main() {
         fi
     fi
 
-    # Get sizes
-    fs_new_size=$(du_size /)
+    # Get sizes - calculate uncompressed size only for included directories
+    # Excluding: proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync
+    # Also exclude mounted filesystems that shouldn't be part of rootfs
+    excludes_calc="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
+    fs_new_size=0
+    for dir in /*; do
+        dir_name="${dir#/}"
+        # Skip excluded directories
+        skip=false
+        for excl in $excludes_calc; do
+            if [ "$dir_name" = "$excl" ]; then
+                skip=true
+                break
+            fi
+        done
+        if [ "$skip" = false ] && [ -d "/$dir_name" ]; then
+            # Special handling for /run - include archiso but exclude mounted bootmnt
+            if [ "$dir_name" = "run" ]; then
+                # Only count size of run/archiso, not the mount point
+                run_archiso_size=$(du_size "/run/archiso" 2>/dev/null || echo 0)
+                fs_new_size=$((fs_new_size + run_archiso_size))
+            else
+                dir_size=$(du_size "/$dir_name")
+                fs_new_size=$((fs_new_size + dir_size))
+            fi
+        fi
+    done
 
     if [ "$ORIG_EXISTS" = true ]; then
         sq_old_size=$(du_size "$SQFILE_FULL")
@@ -158,9 +183,9 @@ main() {
         sq_old_size=0
         echo "No original airootfs to compare"
     fi
-    echo "Estimated new size: $(fmt_size $fs_new_size)"
+    echo "Estimated new size (uncompressed): $(fmt_size $fs_new_size)"
 
-    # Compression factor (rough estimate)
+    # Compression factor (rough estimate - actual may vary based on content)
     if [ "$ORIG_EXISTS" = true ]; then
         old_comp=$(sqfs_comp_type "$SQFILE_FULL")
     else
@@ -182,7 +207,7 @@ main() {
 
     echo "Boot device total: $(fmt_size $boot_total)"
     echo "Boot device free: $(fmt_size $boot_avail)"
-    echo "Estimated new squashfs size: $(fmt_size $sq_new_size_est)"
+    echo "Estimated compressed size: $(fmt_size $sq_new_size_est) (using ${factor}% compression ratio)"
 
     if [ $boot_avail -lt $safe_estimate ]; then
         echo "Not enough space: $boot_avail MiB available, need $safe_estimate MiB"
@@ -206,25 +231,14 @@ main() {
 
     # Excludes: runtime mounts and cache
     excludes="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
-    exclude_size=0
-    for excl in $excludes; do
-        if [ -d "/$excl" ]; then
-            excl_size=$(du_size "/$excl")
-            exclude_size=$((exclude_size + excl_size))
-        fi
-    done
-    # Also calculate size of /run for exclusion
-    if [ -d "/run" ]; then
-        run_size=$(du_size "/run")
-        exclude_size=$((exclude_size + run_size))
-    fi
-    fs_new_size=$((fs_new_size - exclude_size))
 
     # Create exclude file
     exclude_file="/tmp/remaster.exclude"
     printf "%s\n" $excludes > "$exclude_file"
-    # Handle /run specially - exclude contents but keep archiso directory
+    # Handle /run specially - preserve archiso directory and exclude everything else in /run
+    # Using negation pattern to ensure /run/archiso is included
     echo "!run/archiso" >> "$exclude_file"
+    echo "!run/archiso/*" >> "$exclude_file"
     echo "run/*" >> "$exclude_file"
 
     mkdir -p "$OUTPUT_DIR"
