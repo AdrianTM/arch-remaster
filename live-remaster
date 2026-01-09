@@ -74,6 +74,18 @@ sqfs_comp_type() {
     esac
 }
 
+# Function to remount a mount point read-write
+remount_rw() {
+    local mp=$1
+    if mount -o remount,rw "$mp" 2>/dev/null; then
+        echo "Remounted $mp RW"
+        return 0
+    else
+        echo "RW remount failed for $mp"
+        return 1
+    fi
+}
+
 # Main function
 main() {
     echo "Arch Live Remaster"
@@ -137,12 +149,10 @@ main() {
         fi
     else
         # Already mounted, try to remount RW
-        if mount -o remount,rw "$BOOT_MP" 2>/dev/null; then
+        if remount_rw "$BOOT_MP"; then
             RW_SUCCESS=true
-            echo "Remounted $BOOT_MP RW"
         else
             RW_SUCCESS=false
-            echo "RW remount failed for $BOOT_MP"
         fi
     fi
 
@@ -164,9 +174,8 @@ main() {
         fi
     elif [ "$RW_SUCCESS" = false ]; then
         # Already mounted, try to remount RW if needed
-        if mount -o remount,rw "$BOOT_MP" 2>/dev/null; then
+        if remount_rw "$BOOT_MP"; then
             RW_SUCCESS=true
-            echo "Remounted $BOOT_MP RW"
         else
             echo "ERROR: Boot device is read-only and cannot be remounted"
             echo "Please remount the device as read-write and run again"
@@ -289,7 +298,7 @@ main() {
     # For live systems, handle replacement based on backup preference
     if [ "$SKIP_MOUNT" = true ]; then
         echo "Preparing to replace airootfs.sfs..."
-        if mount -o remount,rw "$BOOT_MP" 2>/dev/null || [ "$BOOT_MP" = "/" ]; then
+        if remount_rw "$BOOT_MP"; then
             if [ "$BACKUP_ORIG" = true ] && [ "$ORIG_EXISTS" = true ]; then
                 echo "Backing up original airootfs.sfs..."
                 mv "$SQFILE_FULL" "$SQFILE_FULL.old"
