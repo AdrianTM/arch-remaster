@@ -113,6 +113,11 @@ main() {
 
         if grep -q 'archisodevice=' /proc/cmdline; then
             BOOT_DEV=$(grep -o 'archisodevice=[^ ]*' /proc/cmdline | cut -d= -f2)
+            # Validate archisodevice value
+            if [ -z "$BOOT_DEV" ] || [[ ! "$BOOT_DEV" =~ ^/dev/ ]]; then
+                echo "ERROR: Invalid or empty archisodevice value: $BOOT_DEV"
+                exit 1
+            fi
             echo "Found archisodevice from cmdline: $BOOT_DEV"
         else
             echo "No boot device found from /proc/cmdline"
