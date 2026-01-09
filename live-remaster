@@ -185,47 +185,11 @@ main() {
     fi
     echo "Estimated new size (uncompressed): $(fmt_size $fs_new_size)"
 
-    # Compression factor (rough estimate - actual may vary based on content)
-    if [ "$ORIG_EXISTS" = true ]; then
-        old_comp=$(sqfs_comp_type "$SQFILE_FULL")
-    else
-        old_comp="$COMP_TYPE"
-    fi
-    case $old_comp in
-        zstd) factor=37 ;;
-        xz) factor=37 ;;
-        gzip) factor=37 ;;
-        lz4) factor=37 ;;
-        *) factor=37 ;;
-    esac
-
-    sq_new_size_est=$((fs_new_size * factor / 100))
-    safe_estimate=$((sq_new_size_est + SAFETY_MARGIN))
-
     boot_total=$(all_space "$BOOT_MP")
     boot_avail=$(free_space "$BOOT_MP")
 
     echo "Boot device total: $(fmt_size $boot_total)"
     echo "Boot device free: $(fmt_size $boot_avail)"
-    echo "Estimated compressed size: $(fmt_size $sq_new_size_est) (using ${factor}% compression ratio)"
-
-    if [ $boot_avail -lt $safe_estimate ]; then
-        echo "Not enough space: $boot_avail MiB available, need $safe_estimate MiB"
-        while true; do
-            read -p "Continue anyway? (y/N): " CONTINUE_CHOICE
-            case "$CONTINUE_CHOICE" in
-                y|Y)
-                    break
-                    ;;
-                ""|n|N)
-                    exit 1
-                    ;;
-                *)
-                    echo "Please answer 'y' or 'n'"
-                    ;;
-            esac
-        done
-    fi
 
     echo "Using compression: $COMP_TYPE"
 
@@ -280,7 +244,16 @@ main() {
 
     sq_new_size=$(du_size "$new_file")
     echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
-    echo "To use the new system, run: mv $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+
+    # Check space before replacing original
+    boot_avail=$(free_space "$BOOT_MP")
+    safe_space=$((sq_new_size + SAFETY_MARGIN))
+
+    if [ $boot_avail -lt $safe_space ] && [ "$ORIG_EXISTS" = true ]; then
+        echo "Not enough space to replace: $boot_avail MiB available, need $safe_space MiB"
+        echo "You can manually replace later: mv $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+        exit 0
+    fi
 
     # For live systems, handle replacement based on backup preference
     if [ "$SKIP_MOUNT" = true ]; then
