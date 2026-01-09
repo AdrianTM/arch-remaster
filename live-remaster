@@ -16,8 +16,18 @@ SKIP_MD5=false
 # Trap for cleanup
 cleanup() {
     if [ "$BOOT_MP" != "/run/archiso/bootmnt" ]; then
-        umount "$BOOT_MP" 2>/dev/null
-        rm -rf "$BOOT_MP"
+        # Safety check: Prevent deletion of critical system paths
+        case "$BOOT_MP" in
+            "/"|"/home"|"/usr"|"/var"|"/etc"|"/boot"|"/root"|"/mnt"|"/media"|"/sys"|"/proc"|"/dev")
+                echo "ERROR: Refusing to delete critical system path: $BOOT_MP"
+                return 1
+                ;;
+        esac
+        if umount "$BOOT_MP" 2>/dev/null; then
+            rm -rf "$BOOT_MP"
+        else
+            echo "Failed to umount $BOOT_MP, skipping rm"
+        fi
     fi
     rm -rf "/tmp/remaster.exclude"
 }
