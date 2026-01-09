@@ -1,0 +1,109 @@
+.\" Manpage for live-remaster
+.\" Contact adrian@example.com for bug reports
+.TH LIVE-REMASTER 1 "2025-01-09" "arch-remaster" "User Commands"
+
+.SH NAME
+live-remaster \- Regenerate airootfs.sfs on a running Arch Linux live system
+
+.SH SYNOPSIS
+.B live-remaster
+.RB [options]
+
+.SH DESCRIPTION
+live-remaster recreates the compressed squashfs root filesystem on a running Arch Linux live system. It packages the current live environment as a new airootfs.sfs, optionally backing up and replacing the original. This tool is designed to be run from a live environment to remaster itself.
+
+.SH OPTIONS
+
+.TP
+.BR -c , --comp <type>
+Compression algorithm (default: zstd). Supported: gzip, lz4, xz, zstd
+.TP
+.BR -g
+Use gzip compression (short option, stackable)
+.TP
+.BR -l
+Use lz4 compression (short option, stackable)
+.TP
+.BR -x
+Use xz compression (short option, stackable)
+.TP
+.BR -z
+Use zstd compression (short option, stackable)
+.TP
+.BR -b , --no-backup
+Skip backing up the original airootfs.sfs. Without this option, you will be prompted to backup if the file exists
+.TP
+.BR -m , --no-md5sum
+Skip MD5 checksum calculation. Can be stacked with other short options
+
+.SH USAGE NOTES
+
+.PP
+The script should be run from a live Arch ISO booted system. It will:
+
+.RS
+.IP 1.
+Detect if the live boot device is mounted at /run/archiso/bootmnt
+.IP 2.
+Calculate the size of the uncompressed root filesystem
+.IP 3.
+Create a new compressed squashfs image
+.IP 4.
+Optionally backup and replace the original airootfs.sfs
+.RE
+
+.SH EXCLUDED DIRECTORIES
+The following directories are excluded from the squashfs:
+.br
+proc, sys, dev, tmp, mnt, media, lost+found, var/tmp, var/log, var/cache, var/lib/pacman/sync, run/* (except run/archiso)
+
+.SH SPACE REQUIREMENTS
+The script checks available space on the boot device before replacing the original file. A safety margin of 20 MiB is included. If insufficient space exists, the new file is left as airootfs.sfs.new for manual replacement.
+
+.SH EXAMPLES
+
+Remaster with default zstd compression:
+.RS
+.PP
+.nf
+sudo ./live-remaster
+.fi
+.RE
+
+Remaster with xz compression and no backup:
+.RS
+.PP
+.nf
+sudo ./live-remaster -x -b
+.fi
+.RE
+
+Stackable options (xz, no backup, no MD5):
+.RS
+.PP
+.nf
+sudo ./live-remaster -xbm
+.fi
+.RE
+
+Use long options:
+.RS
+.PP
+.nf
+sudo ./live-remaster --comp gzip --no-backup --no-md5sum
+.fi
+.RE
+
+.SH REQUIREMENTS
+The following programs must be available:
+.br
+mksquashfs, md5sum
+
+.SH SAFETY MARGIN
+20 MiB is reserved as a safety margin when checking available space on the boot device.
+
+.SH AUTHOR
+Written for the arch-remaster project. Adapted from antiX live-remaster for Arch Linux.
+
+.SH REPORTING BUGS
+Report issues at the arch-remaster project repository.
