@@ -214,7 +214,10 @@ main() {
 
     # Create exclude file
     exclude_file="/tmp/remaster.exclude"
-    printf "%s\n" $excludes > "$exclude_file"
+    > "$exclude_file"
+    for excl in $excludes; do
+        echo "$excl" >> "$exclude_file"
+    done
     # Handle /run specially - preserve archiso directory and exclude everything else in /run
     # Using negation pattern to ensure /run/archiso is included
     echo "!run/archiso" >> "$exclude_file"
