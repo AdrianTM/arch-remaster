@@ -347,13 +347,15 @@ main() {
             fi
             if [ "$BOOT_MP" != "/" ]; then
                 # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
-                root_fs=$(df --output=source / | tail -n1)
-                boot_fs=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
-                if [ "$root_fs" != "$boot_fs" ] || [ -z "$boot_fs" ]; then
+                # If both are on the same device, remounting RO would freeze the entire system
+                root_device=$(df --output=source / | tail -n1)
+                boot_device=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
+                # Safe to remount RO only if: different devices OR df failed to detect boot device
+                if [ "$root_device" != "$boot_device" ] || [ -z "$boot_device" ]; then
                     echo "Remounting $BOOT_MP RO..."
                     mount -o remount,ro "$BOOT_MP"
                 else
-                    echo "WARNING: Skipping RO remount to avoid locking root filesystem"
+                    echo "WARNING: Skipping RO remount (boot on same device as root: $root_device)"
                 fi
             fi
             echo "Replacement complete. Reboot to test the new system."
