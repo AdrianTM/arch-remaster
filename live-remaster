@@ -94,6 +94,9 @@ remount_rw() {
 main() {
     echo "Arch Live Remaster v$VERSION"
 
+    # Excludes: runtime mounts and cache
+    excludes="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
+
     # Set boot mount point
     BOOT_MP="/run/archiso/bootmnt"
 
@@ -195,13 +198,12 @@ main() {
     # Get sizes - calculate uncompressed size only for included directories
     # Excluding: proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync
     # Also exclude mounted filesystems that shouldn't be part of rootfs
-    excludes_calc="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
     fs_new_size=0
     for dir in /*; do
         dir_name="${dir#/}"
         # Skip excluded directories
         skip=false
-        for excl in $excludes_calc; do
+        for excl in $excludes; do
             if [ "$dir_name" = "$excl" ]; then
                 skip=true
                 break
@@ -236,9 +238,6 @@ main() {
     echo "Boot device free: $(fmt_size $boot_avail)"
 
     echo "Using compression: $COMP_TYPE"
-
-    # Excludes: runtime mounts and cache
-    excludes="proc sys dev tmp mnt media lost+found var/tmp var/log var/cache var/lib/pacman/sync"
 
     # Create exclude file
     exclude_file="/tmp/remaster.exclude"
