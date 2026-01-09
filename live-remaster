@@ -285,12 +285,6 @@ main() {
     echo "Moving to final file..."
     mv "$tmp_file" "$new_file"
 
-    # Update md5
-    if [ "$SKIP_MD5" = false ]; then
-        echo "Calculating MD5 checksum..."
-        md5sum "$new_file" > "$new_file.md5"
-    fi
-
     sq_new_size=$(du_size "$new_file")
     echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
 
