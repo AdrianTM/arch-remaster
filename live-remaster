@@ -12,6 +12,7 @@ SAFETY_MARGIN=20
 # Default settings
 BACKUP_ORIG=
 SKIP_MD5=false
+CREATED_MP=false
 
 # Check for root privileges and self-elevate if needed
 if [ "$(id -u)" -ne 0 ]; then
@@ -20,7 +21,7 @@ fi
 
 # Trap for cleanup
 cleanup() {
-    if [ "$BOOT_MP" != "/run/archiso/bootmnt" ]; then
+    if [ "$CREATED_MP" = true ]; then
         # Safety check: Prevent deletion of critical system paths
         case "$BOOT_MP" in
             "/"|"/home"|"/usr"|"/var"|"/etc"|"/boot"|"/root"|"/mnt"|"/media"|"/sys"|"/proc"|"/dev")
@@ -150,6 +151,7 @@ main() {
             echo "Attempting to mount $BOOT_DEV to $BOOT_MP"
             mount "$BOOT_DEV" "$BOOT_MP" || { echo "Cannot mount boot device $BOOT_DEV"; exit 1; }
             echo "Mounted boot device at $BOOT_MP"
+            CREATED_MP=true
         fi
     else
         # Already mounted, try to remount RW
