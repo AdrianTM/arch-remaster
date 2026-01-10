@@ -37,7 +37,17 @@ USAGE
 }
 
 fatal() { echo "$ME: error: $*" >&2; exit 2; }
-need() { command -v "$1" >/dev/null 2>&1 || fatal "Missing required program: $1"; }
+need() {
+    if ! command -v "$1" >/dev/null 2>&1; then
+        case $1 in
+            mksquashfs) fatal "Missing $1 (install package: squashfs-tools)" ;;
+            grub-mkrescue) fatal "Missing $1 (install package: grub)" ;;
+            xorriso) fatal "Missing $1 (install package: xorriso or libisoburn)" ;;
+            md5sum) fatal "Missing $1 (install package: coreutils)" ;;
+            *) fatal "Missing required program: $1" ;;
+        esac
+    fi
+}
 
 FROM=
 OUT=
