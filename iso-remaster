@@ -155,7 +155,10 @@ ROOTFS_DIR=$ARCH_DIR/$ARCH
 
 mkdir -p "$BOOT_DIR" "$ROOTFS_DIR" "$ISO_DIR/boot/grub"
 
-[[ -d $FROM/boot ]] || fatal "Missing /boot directory in rootfs: $FROM/boot"
+# Only check for /boot directory if using default kernel/initrd paths
+if [[ -z $KERNEL || -z $INITRD ]]; then
+    [[ -d $FROM/boot ]] || fatal "Missing /boot directory in rootfs: $FROM/boot"
+fi
 
 KERNEL=${KERNEL:-$FROM/boot/vmlinuz-linux}
 INITRD=${INITRD:-$FROM/boot/archiso.img}
