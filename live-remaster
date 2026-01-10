@@ -344,16 +344,6 @@ main() {
     sq_new_size=$(du_size "$new_file")
     echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
 
-    # Check space before replacing original
-    boot_avail=$(free_space "$BOOT_MP")
-    safe_space=$((sq_new_size + SAFETY_MARGIN))
-
-    if [ $boot_avail -lt $safe_space ] && [ "$ORIG_EXISTS" = true ]; then
-        echo "Not enough space to replace: $boot_avail MiB available, need $safe_space MiB"
-        echo "You can manually replace later: mv $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
-        exit 0
-    fi
-
     # Handle replacement based on backup preference
     echo "Preparing to replace airootfs.sfs..."
     if remount_rw "$BOOT_MP"; then
