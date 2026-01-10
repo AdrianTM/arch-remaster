@@ -1,7 +1,7 @@
 # Maintainer: Adrian <adrian@example.com>
 
 pkgname=arch-remaster
-pkgver=1.0
+pkgver=26.01
 pkgrel=1
 pkgdesc="Tools for remastering Arch Linux ISOs and updating live USB GRUB configs"
 arch=('any')
