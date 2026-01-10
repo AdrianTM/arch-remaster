@@ -11,14 +11,16 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-  Tools/arch-remaster --from <rootfs> --out <file.iso> [options]
+  ./iso-remaster --out <file.iso> [options]
 
 Build an archiso-style ISO from an existing Arch root filesystem directory.
 This is intended for snapshot/remaster workflows (host-side).
 
 Required:
-  --from <dir>         Root filesystem to snapshot (e.g. /mnt/rootfs)
   --out <file.iso>     Output ISO path
+
+Optional:
+  --from <dir>         Root filesystem to snapshot (default: /)
 
 Options:
   --arch <arch>        Default: x86_64
@@ -31,8 +33,9 @@ Options:
   -m|--no-md5sum       Skip MD5 checksum calculation (can be stacked)
   --verbose            Enable verbose output
 
-Example:
-  sudo Tools/arch-remaster --from /mnt/arch-root --out ./archlive.iso --label ARCHLIVE
+Examples:
+  sudo ./iso-remaster --out ./archlive.iso --label ARCHLIVE
+  sudo ./iso-remaster --from /mnt/arch-root --out ./custom.iso
 USAGE
 }
 
@@ -50,6 +53,7 @@ need() {
 }
 
 FROM=
+FROM_PROVIDED=false
 OUT=
 ARCH=x86_64
 LABEL=Arch-Live
@@ -64,7 +68,7 @@ VERBOSE=false
 while (( $# )); do
     case $1 in
         -h|--help) usage; exit 0 ;;
-        --from) FROM=${2:-}; shift 2 ;;
+        --from) FROM=${2:-}; FROM_PROVIDED=true; shift 2 ;;
         --out) OUT=${2:-}; shift 2 ;;
         --arch) ARCH=${2:-}; shift 2 ;;
         --label) LABEL=${2:-}; shift 2 ;;
@@ -90,7 +94,13 @@ while (( $# )); do
     esac
 done
 
-[[ -n $FROM && -n $OUT ]] || { usage; exit 2; }
+[[ -n $OUT ]] || { usage; exit 2; }
+
+# Set default for FROM if not provided
+if [[ $FROM_PROVIDED == false ]]; then
+    FROM=/
+    echo "$ME: warning: --from not set, defaulting to / (host root)" >&2
+fi
 
 # Validate and normalize paths
 [[ $FROM == /* ]] || fatal "--from must be an absolute path: $FROM"
@@ -188,7 +198,9 @@ EXCLUDES=(
 
 EXTRA=()
 case $COMP in
+    # Block size 256KB (262144 bytes) for better compression ratio with xz/zstd
     xz) EXTRA=(-b 262144) ;;
+    # For zstd, use 256KB blocks and compression level 15 (good balance of speed/ratio)
     zstd) EXTRA=(-b 262144 -Xcompression-level 15) ;;
     gzip|lz4|lzo) ;;  # No extra options
     *) fatal "Unsupported compression: $COMP (supported: gzip, lz4, lzo, xz, zstd)" ;;

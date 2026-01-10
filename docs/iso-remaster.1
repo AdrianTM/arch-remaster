@@ -7,7 +7,8 @@ iso-remaster \- Build an archiso-style ISO from an existing Arch root filesystem
 
 .SH SYNOPSIS
 .B iso-remaster
-.RI --from <rootfs> --out <file.iso>
+.RI --out <file.iso>
+.RB [--from\ <rootfs>]
 .RB [options]
 
 .SH DESCRIPTION
@@ -16,14 +17,14 @@ iso-remaster creates a bootable ISO image from an existing Arch Linux root files
 .SH REQUIRED OPTIONS
 
 .TP
-.BR --from <dir>
-Root filesystem directory to snapshot (e.g., /mnt/rootfs)
-.TP
 .BR --out <file.iso>
 Output ISO path
 
 .SH OPTIONS
 
+.TP
+.BR --from <dir>
+Root filesystem directory to snapshot (default: /). Example: /mnt/rootfs
 .TP
 .BR --arch <arch>
 Architecture for the ISO (default: x86_64)
@@ -53,6 +54,14 @@ Skip MD5 checksum calculation. Can be stacked with other short options
 Enable verbose output for debugging
 
 .SH EXAMPLES
+
+Create an ISO from the host root filesystem:
+.RS
+.PP
+.nf
+sudo ./iso-remaster --out ./archlive.iso
+.fi
+.RE
 
 Create an ISO from a mounted rootfs:
 .RS
@@ -98,7 +107,7 @@ The following programs must be available:
 mksquashfs, grub-mkrescue, xorriso, md5sum
 
 .SH NOTES
-The script runs with `set -euo pipefail` for safety and will clean up temporary files on exit.
+If --from is omitted, it defaults to / (the host root filesystem). The script runs with `set -euo pipefail` for safety and will clean up temporary files on exit.
 
 .SH AUTHOR
 Written for the arch-remaster project.
