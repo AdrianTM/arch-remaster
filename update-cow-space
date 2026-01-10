@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Update CoW space in GRUB config for Arch live USB
-# Usage: ./update-cow-space.sh <mount_point>
+# Usage: ./update-cow-space
 
 set -euo pipefail
 
@@ -11,31 +11,69 @@ fatal() { echo "$ME: error: $*" >&2; exit 1; }
 
 usage() {
     cat <<USAGE
-Usage: $ME <mount_point>
+Usage: $ME
 
-Update the CoW space parameter in GRUB config on a mounted Arch live USB.
+Update the CoW space parameter in GRUB config on the running Arch live USB.
 
-Arguments:
-  <mount_point>  Mount point of the USB boot partition (e.g., /mnt/usb)
-
-Example:
-  sudo $ME /mnt/usb
+This script detects if running from live USB and updates the appropriate GRUB config.
+For copytoram mode, it will attempt to mount the boot partition automatically.
 USAGE
 }
 
-if [[ $# -ne 1 ]]; then
+if [[ $# -gt 0 ]]; then
     usage
     exit 1
 fi
 
-MOUNT_POINT=$1
+# Check if running in live environment
+[[ -d /run/archiso ]] || fatal "Not running in Arch live environment (/run/archiso not found)"
 
-# Check if mount point exists and is a directory
-[[ -d $MOUNT_POINT ]] || fatal "Mount point '$MOUNT_POINT' is not a directory"
+MOUNT_POINT=""
+CREATED_MP=false
+
+# Check for copytoram mode
+if [ -f "/run/archiso/copytoram/airootfs.sfs" ]; then
+    echo "Detected copytoram mode. Attempting to mount boot partition for updating GRUB config."
+    # Try to find MXarch-Live partition
+    LIVE_PART=$(blkid -l -t LABEL=MXarch-Live -o device 2>/dev/null)
+    if [ -n "$LIVE_PART" ]; then
+        TMP_MOUNT="/tmp/archiso_boot"
+        mkdir -p "$TMP_MOUNT"
+        if mount "$LIVE_PART" "$TMP_MOUNT" 2>/dev/null; then
+            MOUNT_POINT="$TMP_MOUNT"
+            CREATED_MP=true
+            echo "Mounted MXarch-Live partition at $MOUNT_POINT"
+        else
+            echo "Failed to mount MXarch-Live partition $LIVE_PART"
+        fi
+    else
+        echo "Could not find MXarch-Live partition with label MXarch-Live"
+    fi
+    if [ -z "$MOUNT_POINT" ]; then
+        # Ask user to provide mount point
+        read -p "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
+        if [ -d "$USER_MP" ] && [ -d "$USER_MP/arch" ] && [ -d "$USER_MP/arch/x86_64" ]; then
+            MOUNT_POINT="$USER_MP"
+            echo "Using user-provided mount point: $MOUNT_POINT"
+        else
+            fatal "Invalid mount point provided. Directory must contain arch/x86_64/"
+        fi
+    fi
+else
+    # Running from USB directly, use bootmnt
+    MOUNT_POINT="/run/archiso/bootmnt"
+    echo "Running from USB, using $MOUNT_POINT"
+fi
+
+# Check if mount point exists and is accessible
+[[ -d $MOUNT_POINT ]] || fatal "Mount point '$MOUNT_POINT' does not exist"
+if ! mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
+    fatal "$MOUNT_POINT is not a mounted filesystem"
+fi
 
 # Check for GRUB config
 GRUB_CFG="$MOUNT_POINT/arch/boot/grub/grub.cfg"
-[[ -f $GRUB_CFG ]] || fatal "GRUB config not found at $GRUB_CFG. Ensure the USB boot partition is mounted."
+[[ -f $GRUB_CFG ]] || fatal "GRUB config not found at $GRUB_CFG"
 
 # Get total memory in GB
 TOTAL_MEM_GB=$(free -g | awk 'NR==2 {print $2}')
@@ -83,3 +121,13 @@ fi
 
 echo "Updated GRUB config with cow_spacesize=$COW_SIZE"
 echo "Reboot the USB to apply changes."
+
+# Cleanup if we mounted
+if [ "$CREATED_MP" = true ]; then
+    if umount "$MOUNT_POINT" 2>/dev/null; then
+        rmdir "$MOUNT_POINT"
+        echo "Unmounted and cleaned up temporary mount"
+    else
+        echo "Failed to unmount $MOUNT_POINT"
+    fi
+fi
