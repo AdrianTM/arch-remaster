@@ -90,6 +90,14 @@ OUT_DIR=$(dirname "$OUT")
 [[ -d $OUT_DIR ]] || fatal "Output directory does not exist: $OUT_DIR"
 [[ -w $OUT_DIR ]] || fatal "Output directory is not writable: $OUT_DIR"
 
+# Validate ISO label (ISO9660 volume ID requirements)
+if [[ ${#LABEL} -gt 32 ]]; then
+    fatal "Label too long (max 32 chars): $LABEL"
+fi
+if [[ ! $LABEL =~ ^[A-Za-z0-9_-]+$ ]]; then
+    fatal "Label contains invalid characters (use A-Z, a-z, 0-9, _, -): $LABEL"
+fi
+
 need mksquashfs
 need grub-mkrescue
 need xorriso
