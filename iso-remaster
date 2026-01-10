@@ -250,7 +250,7 @@ if [[ $SKIP_MD5 == false ]]; then
     (cd "$ROOTFS_DIR" && md5sum airootfs.sfs > "$MD5")
 else
     rm -f "$MD5"  # Remove any existing MD5 file to avoid stale checksums
-    [[ $QUIET == false ]] && echo "$ME: skipping MD5 checksum (--no-md5sum)"
+    [[ $QUIET == false ]] && echo "$ME: skipping MD5 checksum --no-md5sum"
 fi
 
 KPARAMS="archisobasedir=arch archisolabel=${LABEL}"
