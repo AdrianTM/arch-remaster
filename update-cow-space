@@ -138,7 +138,7 @@ if grep -q "cow_spacesize" "$GRUB_CFG"; then
     sed -i "s/cow_spacesize=[^ ]*/cow_spacesize=$COW_SIZE/" "$GRUB_CFG"
 else
     echo "Adding cow_spacesize parameter..."
-    sed -i "s|linux  /arch/boot/|linux  /arch/boot/ cow_spacesize=$COW_SIZE |" "$GRUB_CFG"
+    sed -i "/^linux / s|$| cow_spacesize=$COW_SIZE|" "$GRUB_CFG"
 fi
 
 echo "Updated GRUB config with cow_spacesize=$COW_SIZE"
