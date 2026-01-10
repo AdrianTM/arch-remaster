@@ -85,6 +85,11 @@ done
 [[ -r $FROM ]] || fatal "--from directory is not readable: $FROM"
 [[ ! -f $OUT ]] || fatal "Output file already exists: $OUT"
 
+# Validate output directory exists and is writable
+OUT_DIR=$(dirname "$OUT")
+[[ -d $OUT_DIR ]] || fatal "Output directory does not exist: $OUT_DIR"
+[[ -w $OUT_DIR ]] || fatal "Output directory is not writable: $OUT_DIR"
+
 need mksquashfs
 need grub-mkrescue
 need xorriso
