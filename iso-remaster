@@ -34,8 +34,8 @@ Options:
   --verbose            Enable verbose output
 
 Examples:
-  sudo ./iso-remaster --out ./archlive.iso --label ARCHLIVE
-  sudo ./iso-remaster --from /mnt/arch-root --out ./custom.iso
+  sudo iso-remaster --out ./archlive.iso --label ARCHLIVE
+  sudo iso-remaster --from /mnt/arch-root --out ./custom.iso
 USAGE
 }
 

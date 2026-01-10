@@ -59,7 +59,7 @@ Create an ISO from the host root filesystem:
 .RS
 .PP
 .nf
-sudo ./iso-remaster --out ./archlive.iso
+sudo iso-remaster --out ./archlive.iso
 .fi
 .RE
 
@@ -67,7 +67,7 @@ Create an ISO from a mounted rootfs:
 .RS
 .PP
 .nf
-sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso
+sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso
 .fi
 .RE
 
@@ -75,7 +75,7 @@ Create with custom label and compression:
 .RS
 .PP
 .nf
-sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso \\
+sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso \\
     --label MYARCH --comp xz
 .fi
 .RE
@@ -84,7 +84,7 @@ Skip MD5 calculation:
 .RS
 .PP
 .nf
-sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso -m
+sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso -m
 .fi
 .RE
 
@@ -92,7 +92,7 @@ With verbose output:
 .RS
 .PP
 .nf
-sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso --verbose
+sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso --verbose
 .fi
 .RE
 
