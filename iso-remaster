@@ -24,9 +24,9 @@ Options:
   --comp <algo>        Squashfs compression (default: zstd)
   --kernel <path>      Default: <from>/boot/vmlinuz-linux
   --initrd <path>      Default: <from>/boot/archiso.img
-  --no-copytoram       Do not include copytoram in grub cmdline
-  -m|--no-md5sum       Skip MD5 checksum calculation (can be stacked)
-  --verbose            Enable verbose output
+   --no-copytoram       Do not include copytoram in grub cmdline
+   -m|--no-md5sum       Skip MD5 checksum calculation (can be stacked)
+   -q|--quiet           Suppress progress output (run quietly)
 
 Examples:
   sudo iso-remaster --out ./archlive.iso --label ARCHLIVE
@@ -69,7 +69,7 @@ KERNEL=
 INITRD=
 COPYTORAM=yes
 SKIP_MD5=false
-VERBOSE=false
+QUIET=false
 
 while (( $# )); do
     case $1 in
@@ -84,7 +84,7 @@ while (( $# )); do
         --initrd) INITRD=${2:-}; shift 2 ;;
         --no-copytoram) COPYTORAM=no; shift ;;
         --no-md5sum) SKIP_MD5=true; shift ;;
-        --verbose) VERBOSE=true; shift ;;
+         --quiet) QUIET=true; shift ;;
         -*)
             OPTS=${1#-}
             while [[ -n $OPTS ]]; do
@@ -236,7 +236,7 @@ args=(-comp "$COMP" "${EXTRA[@]}")
 for excl in "${EXCLUDES[@]}"; do
     args+=(-e "$excl")
 done
-if [[ $VERBOSE == true ]]; then
+if [[ $QUIET == false ]]; then
     echo "$ME: building squashfs ($COMP) from $FROM -> $SFS"
     mksquashfs "$FROM" "$SFS" "${args[@]}"
 else
@@ -250,7 +250,7 @@ if [[ $SKIP_MD5 == false ]]; then
     (cd "$ROOTFS_DIR" && md5sum airootfs.sfs > "$MD5")
 else
     rm -f "$MD5"  # Remove any existing MD5 file to avoid stale checksums
-    [[ $VERBOSE == true ]] && echo "$ME: skipping MD5 checksum (--no-md5sum)"
+    [[ $QUIET == false ]] && echo "$ME: skipping MD5 checksum (--no-md5sum)"
 fi
 
 KPARAMS="archisobasedir=arch archisolabel=${LABEL}"
@@ -267,7 +267,7 @@ menuentry "${LABEL} (${ARCH})" {
 }
 GRUBCFG
 
-if [[ $VERBOSE == true ]]; then
+if [[ $QUIET == false ]]; then
     echo "$ME: creating ISO -> $OUT"
     grub-mkrescue -o "$OUT" -volid "$LABEL" --xorriso="-iso-level 3" "$ISO_DIR"
 else

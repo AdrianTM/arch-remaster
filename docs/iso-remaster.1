@@ -50,8 +50,8 @@ Do not include copytoram in GRUB kernel cmdline
 .BR -m , --no-md5sum
 Skip MD5 checksum calculation. Can be stacked with other short options
 .TP
-.BR --verbose
-Enable verbose output for debugging
+.BR -q , --quiet
+Suppress progress output (run quietly)
 
 .SH EXAMPLES
 
@@ -88,13 +88,13 @@ sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso -m
 .fi
 .RE
 
-With verbose output:
-.RS
-.PP
-.nf
-sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso --verbose
-.fi
-.RE
+ Run quietly:
+ .RS
+ .PP
+ .nf
+ sudo iso-remaster --from /mnt/arch-root --out ./archlive.iso --quiet
+ .fi
+ .RE
 
 .SH EXCLUDED DIRECTORIES
 The following directories are excluded from the squashfs:
