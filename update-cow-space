@@ -14,9 +14,12 @@ fatal() { echo "$ME: error: $*" >&2; exit 1; }
 
 usage() {
     cat <<USAGE
-Usage: $ME [options]
+Usage: $ME <cow_size> [options]
 
 Update the CoW space parameter in GRUB config on the running Arch live USB.
+
+Arguments:
+  <cow_size>     CoW space size (e.g., 1G, 512M)
 
 This script detects if running from live USB and updates the appropriate GRUB config.
 For copytoram mode, it will attempt to mount the boot partition automatically.
@@ -27,20 +30,34 @@ Options:
 USAGE
 }
 
-# Parse options
+# Parse options and arguments
+COW_SIZE=""
 while [ $# -gt 0 ]; do
     case $1 in
         -h|--help) usage; exit 0 ;;
         -v|--version) echo "Update CoW Space v$VERSION"; exit 0 ;;
-        *) usage; exit 1 ;;
+        -*)
+            usage
+            exit 1
+            ;;
+        *)
+            if [ -z "$COW_SIZE" ]; then
+                COW_SIZE=$1
+            else
+                usage
+                exit 1
+            fi
+            ;;
     esac
+    shift
 done
 
-# Allow help without root privileges
-if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
+if [ -z "$COW_SIZE" ]; then
     usage
-    exit 0
+    exit 1
 fi
+
+# Allow help without root privileges (already handled above)
 
 # Check for root privileges and self-elevate if needed
 if [ "$(id -u)" -ne 0 ]; then
@@ -101,24 +118,8 @@ fi
 GRUB_CFG="$MOUNT_POINT/boot/grub/grub.cfg"
 [[ -f $GRUB_CFG ]] || fatal "GRUB config not found at $GRUB_CFG"
 
-# Get total memory in GB
-TOTAL_MEM_GB=$(free -g | awk 'NR==2 {print $2}')
-echo "Total system memory: ${TOTAL_MEM_GB}GB"
-
-# Suggest CoW size based on memory
-if [[ $TOTAL_MEM_GB -lt 4 ]]; then
-    SUGGESTED="512M"
-elif [[ $TOTAL_MEM_GB -lt 8 ]]; then
-    SUGGESTED="1G"
-else
-    SUGGESTED="2G"
-fi
-
-echo "Suggested CoW space: $SUGGESTED (adjust based on your needs)"
-read -p "Enter CoW space size (e.g., 1G, 512M): " COW_SIZE
-
-# Validate input (basic check)
-[[ $COW_SIZE =~ ^[0-9]+[MG]$ ]] || fatal "Invalid size format. Use e.g., 1G or 512M"
+# Validate COW_SIZE
+[[ $COW_SIZE =~ ^[0-9]+[MG]$ ]] || fatal "Invalid size format: $COW_SIZE. Use e.g., 1G or 512M"
 
 # Check if read-write
 if ! touch "$MOUNT_POINT/.test_write" 2>/dev/null; then

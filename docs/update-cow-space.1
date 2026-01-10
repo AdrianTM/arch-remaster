@@ -7,13 +7,20 @@ update-cow-space \- Update CoW space parameter in GRUB config for Arch live USB
 
 .SH SYNOPSIS
 .B update-cow-space
+.RI <cow_size>
 .RB [ -h | --help ]
 .RB [ -v | --version ]
 
 .SH DESCRIPTION
 update-cow-space updates the CoW (Copy-on-Write) space parameter in the GRUB configuration for a running Arch Linux live USB. It detects whether the system is running from live USB or in copytoram mode and automatically handles mounting the boot partition if necessary.
 
-The script prompts for the desired CoW space size, suggests a reasonable value based on system memory, and modifies the GRUB config to add or update the cow_spacesize kernel parameter.
+The script takes the desired CoW space size as an argument and modifies the GRUB config to add or update the cow_spacesize kernel parameter.
+
+.SH ARGUMENTS
+
+.TP
+.BR <cow_size>
+The CoW space size to set (e.g., 1G, 512M).
 
 .SH OPTIONS
 
@@ -27,11 +34,11 @@ Display version information and exit.
 
 .SH EXAMPLES
 
-Update CoW space on a running live USB:
+Update CoW space to 1G on a running live USB:
 .RS
 .PP
 .nf
-sudo update-cow-space
+sudo update-cow-space 1G
 .fi
 .RE
 
