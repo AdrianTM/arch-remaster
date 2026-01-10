@@ -156,11 +156,7 @@ cleanup() {
             [[ -d ${WORK} ]] && rm -rf "$WORK"
         fi
     fi
-    # Remove partial output file on failure
-    if [[ $exit_code -ne 0 && -f ${OUT:-} ]]; then
-        echo "$ME: removing partial output file: $OUT" >&2
-        rm -f "$OUT"
-    fi
+    # Note: Keeping partial output file for debugging (do not remove on failure)
 }
 trap cleanup EXIT
 
@@ -267,11 +263,11 @@ GRUBCFG
 
 if [[ $VERBOSE == true ]]; then
     echo "$ME: creating ISO -> $OUT"
-    grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR"
+    grub-mkrescue -o "$OUT" -volid "$LABEL" --xorriso="-iso-level 3" "$ISO_DIR"
 else
     # Suppress progress output but preserve error messages (stderr)
     echo "$ME: creating ISO -> $OUT (this may take a few minutes)..."
-    grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR" 1>/dev/null
+    grub-mkrescue -o "$OUT" -volid "$LABEL" --xorriso="-iso-level 3" "$ISO_DIR" 1>/dev/null
     echo "$ME: ISO creation complete"
 fi
 
