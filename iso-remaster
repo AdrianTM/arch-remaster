@@ -132,6 +132,22 @@ case $COMP in
     *) fatal "Unsupported compression: $COMP (supported: gzip, lz4, lzo, xz, zstd)" ;;
 esac
 
+# Check disk space before creating squashfs
+echo "$ME: checking disk space..."
+AVAIL_MB=$(df -BM "$WORK" | awk 'NR==2 {gsub(/M/, "", $4); print $4}')
+# Estimate source size (du follows symlinks by default, -s for summary)
+# This is a rough estimate; squashfs will compress but we need working space
+SOURCE_MB=$(du -sm "$FROM" 2>/dev/null | awk '{print $1}' || echo 0)
+
+# Require at least source size + 500MB margin for temporary files and compression overhead
+REQUIRED_MB=$((SOURCE_MB + 500))
+
+if [[ $SOURCE_MB -eq 0 ]]; then
+    echo "$ME: warning: could not estimate source size, skipping space check" >&2
+elif [[ $AVAIL_MB -lt $REQUIRED_MB ]]; then
+    fatal "Insufficient disk space: need ${REQUIRED_MB}MB, have ${AVAIL_MB}MB in $WORK"
+fi
+
 echo "$ME: building squashfs ($COMP) from $FROM -> $SFS"
 
 rm -f "$SFS"
