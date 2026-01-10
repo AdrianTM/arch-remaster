@@ -1,0 +1,4 @@
+# Build directories
+arch-remaster-*/
+
+# Other ignores if needed
