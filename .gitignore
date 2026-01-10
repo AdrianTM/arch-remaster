@@ -1,4 +1,5 @@
 # Build directories
 arch-remaster-*/
+src/
 
 # Other ignores if needed
