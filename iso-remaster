@@ -91,6 +91,12 @@ while (( $# )); do
 done
 
 [[ -n $FROM && -n $OUT ]] || { usage; exit 2; }
+
+# Validate and normalize paths
+[[ $FROM == /* ]] || fatal "--from must be an absolute path: $FROM"
+# Convert OUT to absolute path if relative
+[[ $OUT == /* ]] || OUT="$(cd "$(dirname "$OUT")" 2>/dev/null && pwd)/$(basename "$OUT")" || fatal "Invalid output path: $OUT"
+
 [[ -d $FROM ]] || fatal "--from is not a directory: $FROM"
 [[ -r $FROM ]] || fatal "--from directory is not readable: $FROM"
 [[ ! -f $OUT ]] || fatal "Output file already exists: $OUT"
