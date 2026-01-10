@@ -18,9 +18,9 @@ source=(
     'iso-remaster'
     'live-remaster'
     'update-cow-space'
-    'docs/iso-remaster.1'
-    'docs/live-remaster.1'
-    'docs/update-cow-space.1'
+    'iso-remaster.1'
+    'live-remaster.1'
+    'update-cow-space.1'
 )
 md5sums=(
     'SKIP'
