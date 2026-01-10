@@ -40,6 +40,9 @@ if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
     exit 0
 fi
 
+# Ensure standard paths are in PATH for tools like xorriso
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"
+
 # Check for root privileges and self-elevate if needed
 if [ "$(id -u)" -ne 0 ]; then
     exec sudo "$0" "$@"
