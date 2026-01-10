@@ -72,7 +72,7 @@ if ! mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
 fi
 
 # Check for GRUB config
-GRUB_CFG="$MOUNT_POINT/arch/boot/grub/grub.cfg"
+GRUB_CFG="$MOUNT_POINT/boot/grub/grub.cfg"
 [[ -f $GRUB_CFG ]] || fatal "GRUB config not found at $GRUB_CFG"
 
 # Get total memory in GB
