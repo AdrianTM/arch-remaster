@@ -132,6 +132,37 @@ main() {
     # Set boot mount point
     BOOT_MP="/run/archiso/bootmnt"
 
+    # Check for copytoram mode and handle boot partition mounting
+    if [ -f "/run/archiso/copytoram/airootfs.sfs" ]; then
+        echo "Detected copytoram mode. Attempting to mount boot partition for writing."
+        # Try to find MXarch-Live partition
+        LIVE_PART=$(blkid -l -t LABEL=MXarch-Live -o device 2>/dev/null)
+        if [ -n "$LIVE_PART" ]; then
+            TMP_MOUNT="/tmp/archiso_boot"
+            mkdir -p "$TMP_MOUNT"
+            if mount "$LIVE_PART" "$TMP_MOUNT" 2>/dev/null; then
+                BOOT_MP="$TMP_MOUNT"
+                CREATED_MP=true
+                echo "Mounted MXarch-Live partition at $BOOT_MP"
+            else
+                echo "Failed to mount MXarch-Live partition $LIVE_PART"
+            fi
+        else
+            echo "Could not find MXarch-Live partition with label MXarch-Live"
+        fi
+        if [ "$BOOT_MP" = "/run/archiso/bootmnt" ]; then
+            # Ask user to provide mount point
+            read -p "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
+            if [ -d "$USER_MP" ] && [ -d "$USER_MP/arch" ] && [ -d "$USER_MP/arch/x86_64" ]; then
+                BOOT_MP="$USER_MP"
+                echo "Using user-provided mount point: $BOOT_MP"
+            else
+                echo "ERROR: Invalid mount point provided. Directory must contain arch/x86_64/"
+                exit 1
+            fi
+        fi
+    fi
+
     # Check if boot mount point exists and is accessible
     if [ ! -d "$BOOT_MP" ]; then
         echo "ERROR: Boot mount point $BOOT_MP does not exist"
