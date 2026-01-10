@@ -272,13 +272,13 @@ GRUBCFG
 
 if [[ $QUIET == false ]]; then
     echo "$ME: creating ISO -> $OUT"
-    if ! grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR"; then
+    if ! grub-mkrescue -o "$OUT" -volid "$LABEL" -l -R -J -pad -iso-level 3 "$ISO_DIR"; then
         fatal "ISO creation failed (check grub-mkrescue output and xorriso availability)"
     fi
 else
     # Suppress progress output but preserve error messages (stderr)
     echo "$ME: creating ISO -> $OUT (this may take a few minutes)..."
-    if ! grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR" 1>/dev/null; then
+    if ! grub-mkrescue -o "$OUT" -volid "$LABEL" -l -R -J -pad -iso-level 3 "$ISO_DIR" 1>/dev/null; then
         fatal "ISO creation failed (check grub-mkrescue output and xorriso availability)"
     fi
     echo "$ME: ISO creation complete"
