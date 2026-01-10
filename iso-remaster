@@ -3,17 +3,6 @@ set -uo pipefail
 
 ME=${0##*/}
 
-# Allow help without root privileges
-if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
-    usage
-    exit 0
-fi
-
-# Check for root privileges and self-elevate if needed
-if [ "$(id -u)" -ne 0 ]; then
-    exec sudo "$0" "$@"
-fi
-
 usage() {
     cat <<'USAGE'
 Usage:
@@ -44,6 +33,17 @@ Examples:
   sudo iso-remaster --from /mnt/arch-root --out ./custom.iso
 USAGE
 }
+
+# Allow help without root privileges
+if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
+    usage
+    exit 0
+fi
+
+# Check for root privileges and self-elevate if needed
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$0" "$@"
+fi
 
 fatal() { echo "$ME: error: $*" >&2; exit 2; }
 need() {
