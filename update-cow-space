@@ -53,38 +53,45 @@ fi
 MOUNT_POINT=""
 CREATED_MP=false
 
-# Check for copytoram mode
-if [ -f "/run/archiso/copytoram/airootfs.sfs" ]; then
-    echo "Detected copytoram mode. Attempting to mount boot partition for updating GRUB config."
-    # Try to find MXarch-Live partition
-    LIVE_PART=$(blkid -l -t LABEL=MXarch-Live -o device 2>/dev/null)
-    if [ -n "$LIVE_PART" ]; then
-        TMP_MOUNT="/tmp/archiso_boot"
-        mkdir -p "$TMP_MOUNT"
-        if mount "$LIVE_PART" "$TMP_MOUNT" 2>/dev/null; then
-            MOUNT_POINT="$TMP_MOUNT"
-            CREATED_MP=true
-            echo "Mounted MXarch-Live partition at $MOUNT_POINT"
-        else
-            echo "Failed to mount MXarch-Live partition $LIVE_PART"
-        fi
+# Find the ESP partition (EFI System Partition) by label
+ESP_LABEL="LIVE-UEFI"
+ESP_PART=$(blkid -l -t LABEL="$ESP_LABEL" -o device 2>/dev/null)
+if [ -z "$ESP_PART" ]; then
+    # Fallback to common labels
+    for label in ARCHISO_EFI MXarch-Live; do
+        ESP_PART=$(blkid -l -t LABEL="$label" -o device 2>/dev/null)
+        [ -n "$ESP_PART" ] && break
+    done
+fi
+if [ -z "$ESP_PART" ]; then
+    fatal "Could not find ESP partition with labels LIVE-UEFI, ARCHISO_EFI, or MXarch-Live"
+fi
+
+# Check if bootmnt is already mounted to the ESP
+BOOTMNT_DEVICE=$(findmnt -n -o SOURCE /run/archiso/bootmnt 2>/dev/null)
+if [ "$BOOTMNT_DEVICE" = "$ESP_PART" ] && [ -d /run/archiso/bootmnt ]; then
+    # bootmnt is correctly mounted to ESP
+    MOUNT_POINT="/run/archiso/bootmnt"
+    echo "Using existing bootmnt at $MOUNT_POINT (mounted to ESP $ESP_PART)"
+else
+    # Need to mount ESP
+    TMP_MOUNT="/tmp/archiso_esp"
+    mkdir -p "$TMP_MOUNT"
+    if mount "$ESP_PART" "$TMP_MOUNT" 2>/dev/null; then
+        MOUNT_POINT="$TMP_MOUNT"
+        CREATED_MP=true
+        echo "Mounted ESP ($ESP_PART) at $MOUNT_POINT"
     else
-        echo "Could not find MXarch-Live partition with label MXarch-Live"
-    fi
-    if [ -z "$MOUNT_POINT" ]; then
+        echo "Failed to mount ESP $ESP_PART"
         # Ask user to provide mount point
-        read -p "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
-        if [ -d "$USER_MP" ] && [ -d "$USER_MP/arch" ] && [ -d "$USER_MP/arch/x86_64" ]; then
+        read -p "Please mount the ESP ($ESP_PART) and provide the mount path: " USER_MP
+        if [ -d "$USER_MP" ] && [ -d "$USER_MP/boot" ] && [ -f "$USER_MP/boot/grub/grub.cfg" ]; then
             MOUNT_POINT="$USER_MP"
             echo "Using user-provided mount point: $MOUNT_POINT"
         else
-            fatal "Invalid mount point provided. Directory must contain arch/x86_64/"
+            fatal "Invalid mount point provided. Directory must contain boot/grub/grub.cfg"
         fi
     fi
-else
-    # Running from USB directly, use bootmnt
-    MOUNT_POINT="/run/archiso/bootmnt"
-    echo "Running from USB, using $MOUNT_POINT"
 fi
 
 # Check if mount point exists and is accessible
