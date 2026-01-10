@@ -35,7 +35,7 @@ Volume label for the ISO (default: Arch-Live)
 Work directory for temporary files (default: mktemp creates a temp dir)
 .TP
 .BR --comp <algo>
-Squashfs compression algorithm (default: zstd). Supported: gzip, lz4, xz, zstd
+Squashfs compression algorithm (default: zstd). Supported: gzip, lz4, lzo, xz, zstd
 .TP
 .BR --kernel <path>
 Path to kernel image (default: <from>/boot/vmlinuz-linux)
@@ -48,6 +48,9 @@ Do not include copytoram in GRUB kernel cmdline
 .TP
 .BR -m , --no-md5sum
 Skip MD5 checksum calculation. Can be stacked with other short options
+.TP
+.BR --verbose
+Enable verbose output for debugging
 
 .SH EXAMPLES
 
@@ -73,6 +76,14 @@ Skip MD5 calculation:
 .PP
 .nf
 sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso -m
+.fi
+.RE
+
+With verbose output:
+.RS
+.PP
+.nf
+sudo ./iso-remaster --from /mnt/arch-root --out ./archlive.iso --verbose
 .fi
 .RE
 

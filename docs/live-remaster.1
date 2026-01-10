@@ -16,7 +16,7 @@ live-remaster recreates the compressed squashfs root filesystem on a running Arc
 
 .TP
 .BR -c , --comp <type>
-Compression algorithm (default: zstd). Supported: gzip, lz4, xz, zstd
+Compression algorithm (default: zstd). Supported: gzip, lzma, lzo, lz4, xz, zstd
 .TP
 .BR -g
 Use gzip compression (short option, stackable)
@@ -30,11 +30,17 @@ Use xz compression (short option, stackable)
 .BR -z
 Use zstd compression (short option, stackable)
 .TP
+.BR -v
+Display version information (short option)
+.TP
 .BR -b , --no-backup
 Skip backing up the original airootfs.sfs. Without this option, you will be prompted to backup if the file exists
 .TP
 .BR -m , --no-md5sum
 Skip MD5 checksum calculation. Can be stacked with other short options
+.TP
+.BR -v , --version
+Display version information
 
 .SH USAGE NOTES
 
@@ -83,6 +89,14 @@ Stackable options (xz, no backup, no MD5):
 .PP
 .nf
 sudo ./live-remaster -xbm
+.fi
+.RE
+
+Display version:
+.RS
+.PP
+.nf
+./live-remaster -v
 .fi
 .RE
 
