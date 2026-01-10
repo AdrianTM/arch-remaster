@@ -40,7 +40,7 @@ package() {
     install -Dm755 "$srcdir/update-cow-space" "$pkgdir/usr/bin/update-cow-space"
 
     # Install man pages
-    install -Dm644 "$srcdir/docs/iso-remaster.1" "$pkgdir/usr/share/man/man1/iso-remaster.1"
-    install -Dm644 "$srcdir/docs/live-remaster.1" "$pkgdir/usr/share/man/man1/live-remaster.1"
-    install -Dm644 "$srcdir/docs/update-cow-space.1" "$pkgdir/usr/share/man/man1/update-cow-space.1"
+    install -Dm644 "$srcdir/iso-remaster.1" "$pkgdir/usr/share/man/man1/iso-remaster.1"
+    install -Dm644 "$srcdir/live-remaster.1" "$pkgdir/usr/share/man/man1/live-remaster.1"
+    install -Dm644 "$srcdir/update-cow-space.1" "$pkgdir/usr/share/man/man1/update-cow-space.1"
 }
