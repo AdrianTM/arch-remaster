@@ -98,6 +98,12 @@ if [[ ! $LABEL =~ ^[A-Za-z0-9_-]+$ ]]; then
     fatal "Label contains invalid characters (use A-Z, a-z, 0-9, _, -): $LABEL"
 fi
 
+# Validate architecture parameter
+case $ARCH in
+    x86_64|i686|aarch64) ;;
+    *) fatal "Unsupported architecture: $ARCH (supported: x86_64, i686, aarch64)" ;;
+esac
+
 need mksquashfs
 need grub-mkrescue
 need xorriso
