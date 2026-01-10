@@ -30,7 +30,10 @@ Root filesystem directory to snapshot (default: /). Example: /mnt/rootfs
 Architecture for the ISO (default: x86_64)
 .TP
 .BR --label <volid>
-Volume label for the ISO (default: Arch-Live)
+Volume label for the ISO (auto-detect from <from>/boot/grub/grub.cfg; fallback: MXarch-Live)
+.TP
+.BR --grub-theme <path>
+Path to GRUB theme.txt in the rootfs (auto-detect if omitted)
 .TP
 .BR --work <dir>
 Work directory for temporary files (default: mktemp creates a temp dir)

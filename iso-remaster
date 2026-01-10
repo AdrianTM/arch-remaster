@@ -19,7 +19,9 @@ Optional:
 
 Options:
   --arch <arch>        Default: x86_64
-  --label <volid>      Default: Arch-Live
+  --label <volid>      Volume label (auto-detect from <from>/boot/grub/grub.cfg)
+                      Default fallback: MXarch-Live
+  --grub-theme <path>  GRUB theme.txt path (auto-detect if omitted)
   --work <dir>         Work directory (default: mktemp)
   --comp <algo>        Squashfs compression (default: zstd)
   --kernel <path>      Default: <from>/boot/vmlinuz-linux
@@ -65,7 +67,7 @@ FROM=
 FROM_PROVIDED=false
 OUT=
 ARCH=x86_64
-LABEL=Arch-Live
+LABEL=
 WORK=
 COMP=zstd
 KERNEL=
@@ -73,6 +75,7 @@ INITRD=
 COPYTORAM=yes
 SKIP_MD5=false
 QUIET=false
+GRUB_THEME=
 
 while (( $# )); do
     case $1 in
@@ -86,6 +89,7 @@ while (( $# )); do
         --kernel) KERNEL=${2:-}; shift 2 ;;
         --initrd) INITRD=${2:-}; shift 2 ;;
         --no-copytoram) COPYTORAM=no; shift ;;
+        --grub-theme) GRUB_THEME=${2:-}; shift 2 ;;
         --no-md5sum) SKIP_MD5=true; shift ;;
          --quiet) QUIET=true; shift ;;
         -*)
@@ -125,6 +129,46 @@ OUT_DIR=$(dirname "$OUT")
 [[ -d $OUT_DIR ]] || fatal "Output directory does not exist: $OUT_DIR"
 [[ -w $OUT_DIR ]] || fatal "Output directory is not writable: $OUT_DIR"
 
+# Validate architecture parameter
+case $ARCH in
+    x86_64|i686|aarch64) ;;
+    *) fatal "Unsupported architecture: $ARCH (supported: x86_64, i686, aarch64)" ;;
+esac
+
+# Auto-detect label from existing GRUB config if not provided
+if [[ -z $LABEL ]]; then
+    GRUB_CFG_SRC=$FROM/boot/grub/grub.cfg
+    if [[ -f $GRUB_CFG_SRC ]]; then
+        LABEL=$(awk '
+            /archisolabel=/{
+                for (i=1;i<=NF;i++) if ($i ~ /^archisolabel=/) {
+                    sub(/^archisolabel=/, "", $i);
+                    print $i;
+                    exit;
+                }
+            }
+            /search .*--label/{
+                for (i=1;i<=NF;i++) {
+                    if ($i=="--label") {
+                        gsub(/"/, "", $(i+1));
+                        print $(i+1);
+                        exit;
+                    }
+                    if ($i ~ /^--label=/) {
+                        sub(/^--label=/, "", $i);
+                        gsub(/"/, "", $i);
+                        print $i;
+                        exit;
+                    }
+                }
+            }
+        ' "$GRUB_CFG_SRC" | head -n1)
+    fi
+    if [[ -z $LABEL ]]; then
+        LABEL=MXarch-Live
+    fi
+fi
+
 # Validate ISO label (ISO9660 volume ID requirements)
 if [[ ${#LABEL} -gt 32 ]]; then
     fatal "Label too long (max 32 chars): $LABEL"
@@ -132,12 +176,6 @@ fi
 if [[ ! $LABEL =~ ^[A-Za-z0-9_-]+$ ]]; then
     fatal "Label contains invalid characters (use A-Z, a-z, 0-9, _, -): $LABEL"
 fi
-
-# Validate architecture parameter
-case $ARCH in
-    x86_64|i686|aarch64) ;;
-    *) fatal "Unsupported architecture: $ARCH (supported: x86_64, i686, aarch64)" ;;
-esac
 
 need mksquashfs
 need grub-mkrescue
@@ -259,9 +297,65 @@ fi
 KPARAMS="archisobasedir=arch archisolabel=${LABEL}"
 [[ $COPYTORAM == yes ]] && KPARAMS="$KPARAMS copytoram"
 
+THEME_PATH=
+THEME_REL=
+if [[ -n ${GRUB_THEME:-} ]]; then
+    if [[ -f $GRUB_THEME ]]; then
+        THEME_PATH=$GRUB_THEME
+    elif [[ -f $FROM/$GRUB_THEME ]]; then
+        THEME_PATH=$FROM/$GRUB_THEME
+    else
+        fatal "--grub-theme not found: $GRUB_THEME"
+    fi
+else
+    for candidate in \
+        "$FROM/boot/grub/themes/mx/theme.txt" \
+        "$FROM/usr/share/grub/themes/mx/theme.txt"
+    do
+        if [[ -f $candidate ]]; then
+            THEME_PATH=$candidate
+            break
+        fi
+    done
+    if [[ -z ${THEME_PATH:-} ]]; then
+        for dir in "$FROM/boot/grub/themes" "$FROM/usr/share/grub/themes"; do
+            if [[ -d $dir ]]; then
+                THEME_PATH=$(find "$dir" -maxdepth 2 -type f -name theme.txt 2>/dev/null | sort | head -n1)
+                [[ -n $THEME_PATH ]] && break
+            fi
+        done
+    fi
+fi
+
+if [[ -n ${THEME_PATH:-} ]]; then
+    THEME_SRC_DIR=$(dirname "$THEME_PATH")
+    THEME_NAME=$(basename "$THEME_SRC_DIR")
+    mkdir -p "$ISO_DIR/boot/grub/themes"
+    cp -a "$THEME_SRC_DIR" "$ISO_DIR/boot/grub/themes/"
+    THEME_REL="/boot/grub/themes/$THEME_NAME/theme.txt"
+    [[ $QUIET == false ]] && echo "$ME: using GRUB theme: $THEME_REL"
+else
+    [[ $QUIET == false ]] && echo "$ME: no GRUB theme found, using default menu"
+fi
+
 cat > "$ISO_DIR/boot/grub/grub.cfg" <<GRUBCFG
 set default=0
 set timeout=5
+GRUBCFG
+
+if [[ -n ${THEME_REL:-} ]]; then
+    cat >> "$ISO_DIR/boot/grub/grub.cfg" <<GRUBCFG
+if [ -f ${THEME_REL} ]; then
+    loadfont /boot/grub/fonts/unicode.pf2
+    insmod all_video
+    insmod gfxterm
+    terminal_output gfxterm
+    set theme=${THEME_REL}
+fi
+GRUBCFG
+fi
+
+cat >> "$ISO_DIR/boot/grub/grub.cfg" <<GRUBCFG
 
 menuentry "${LABEL} (${ARCH})" {
     search --no-floppy --set=root --label "${LABEL}"
