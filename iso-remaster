@@ -163,7 +163,8 @@ done
 if [[ $VERBOSE == true ]]; then
     mksquashfs "$FROM" "$SFS" "${args[@]}"
 else
-    mksquashfs "$FROM" "$SFS" "${args[@]}" >/dev/null
+    # Suppress progress output but preserve error messages (stderr)
+    mksquashfs "$FROM" "$SFS" "${args[@]}" 1>/dev/null
 fi
 
 if [[ $SKIP_MD5 == false ]]; then
@@ -190,7 +191,8 @@ echo "$ME: creating ISO -> $OUT"
 if [[ $VERBOSE == true ]]; then
     grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR"
 else
-    grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR" >/dev/null
+    # Suppress progress output but preserve error messages (stderr)
+    grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR" 1>/dev/null
 fi
 
 echo "$ME: done"
