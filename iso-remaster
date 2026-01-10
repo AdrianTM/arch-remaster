@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -uo pipefail
 
 ME=${0##*/}
 
@@ -208,10 +208,17 @@ esac
 
 # Check disk space before creating squashfs
 echo "$ME: checking disk space..."
-AVAIL_MB=$(df -BM "$WORK" | awk 'END {gsub(/M/, "", $4); print $4}')
+AVAIL_MB=$(df -BM "$WORK" | awk 'END {gsub(/M/, "", $4); print $4+0}')
 # Estimate source size (du follows symlinks by default, -s for summary)
 # This is a rough estimate; squashfs will compress but we need working space
-SOURCE_MB=$(du -sm "$FROM" 2>/dev/null | awk '{print $1}' || echo 0)
+SOURCE_MB=$(du -sm "$FROM" 2>/dev/null | awk 'NR==1 {print $1+0}')
+
+if [[ ! $AVAIL_MB =~ ^[0-9]+$ ]]; then
+    AVAIL_MB=0
+fi
+if [[ ! $SOURCE_MB =~ ^[0-9]+$ ]]; then
+    SOURCE_MB=0
+fi
 
 # Require at least source size + 500MB margin for temporary files and compression overhead
 REQUIRED_MB=$((SOURCE_MB + 500))
