@@ -3,6 +3,9 @@
 # Update CoW space in GRUB config for Arch live USB
 # Usage: ./update-cow-space
 
+# Version
+VERSION="1.0"
+
 set -euo pipefail
 
 ME=${0##*/}
@@ -11,18 +14,37 @@ fatal() { echo "$ME: error: $*" >&2; exit 1; }
 
 usage() {
     cat <<USAGE
-Usage: $ME
+Usage: $ME [options]
 
 Update the CoW space parameter in GRUB config on the running Arch live USB.
 
 This script detects if running from live USB and updates the appropriate GRUB config.
 For copytoram mode, it will attempt to mount the boot partition automatically.
+
+Options:
+  -h, --help     Show this help message
+  -v, --version  Show version information
 USAGE
 }
 
-if [[ $# -gt 0 ]]; then
+# Parse options
+while [ $# -gt 0 ]; do
+    case $1 in
+        -h|--help) usage; exit 0 ;;
+        -v|--version) echo "Update CoW Space v$VERSION"; exit 0 ;;
+        *) usage; exit 1 ;;
+    esac
+done
+
+# Allow help without root privileges
+if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
     usage
-    exit 1
+    exit 0
+fi
+
+# Check for root privileges and self-elevate if needed
+if [ "$(id -u)" -ne 0 ]; then
+    exec sudo "$0" "$@"
 fi
 
 # Check if running in live environment

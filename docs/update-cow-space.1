@@ -1,0 +1,49 @@
+.\" Manpage for update-cow-space
+.\" Contact adrian@example.com for bug reports
+.TH UPDATE-COW-SPACE 1 "2025-01-09" "arch-remaster" "User Commands"
+
+.SH NAME
+update-cow-space \- Update CoW space parameter in GRUB config for Arch live USB
+
+.SH SYNOPSIS
+.B update-cow-space
+.RB [ -h | --help ]
+.RB [ -v | --version ]
+
+.SH DESCRIPTION
+update-cow-space updates the CoW (Copy-on-Write) space parameter in the GRUB configuration for a running Arch Linux live USB. It detects whether the system is running from live USB or in copytoram mode and automatically handles mounting the boot partition if necessary.
+
+The script prompts for the desired CoW space size, suggests a reasonable value based on system memory, and modifies the GRUB config to add or update the cow_spacesize kernel parameter.
+
+.SH OPTIONS
+
+.TP
+.BR -h , --help
+Display help message and exit.
+
+.TP
+.BR -v , --version
+Display version information and exit.
+
+.SH EXAMPLES
+
+Update CoW space on a running live USB:
+.RS
+.PP
+.nf
+sudo update-cow-space
+.fi
+.RE
+
+.SH NOTES
+This script requires root privileges and should be run on an Arch Linux live USB environment. It will detect copytoram mode and mount the EFI partition if needed. Reboot the USB after updating to apply changes.
+
+.SH AUTHOR
+Written for the arch-remaster project.
+
+.SH REPORTING BUGS
+Report issues at the arch-remaster project repository.
+
+.SH SEE ALSO
+.BR live-remaster (1),
+.BR iso-remaster (1)
