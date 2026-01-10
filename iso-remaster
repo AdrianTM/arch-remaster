@@ -208,7 +208,7 @@ esac
 
 # Check disk space before creating squashfs
 echo "$ME: checking disk space..."
-AVAIL_MB=$(df -BM "$WORK" | awk 'NR==2 {gsub(/M/, "", $4); print $4}')
+AVAIL_MB=$(df -BM "$WORK" | awk 'END {gsub(/M/, "", $4); print $4}')
 # Estimate source size (du follows symlinks by default, -s for summary)
 # This is a rough estimate; squashfs will compress but we need working space
 SOURCE_MB=$(du -sm "$FROM" 2>/dev/null | awk '{print $1}' || echo 0)
