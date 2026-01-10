@@ -3,6 +3,12 @@ set -uo pipefail
 
 ME=${0##*/}
 
+# Allow help without root privileges
+if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
+    usage
+    exit 0
+fi
+
 # Check for root privileges and self-elevate if needed
 if [ "$(id -u)" -ne 0 ]; then
     exec sudo "$0" "$@"
