@@ -24,6 +24,14 @@ fi
 
 # Trap for cleanup
 cleanup() {
+    # Check for orphaned temporary backup (indicates interrupted replacement)
+    if [ -n "$BOOT_MP" ] && [ -f "$BOOT_MP/arch/x86_64/airootfs.sfs.tmp.backup" ]; then
+        echo ""
+        echo "WARNING: Temporary backup file found at $BOOT_MP/arch/x86_64/airootfs.sfs.tmp.backup"
+        echo "This may indicate an interrupted replacement. To recover:"
+        echo "  mv $BOOT_MP/arch/x86_64/airootfs.sfs.tmp.backup $BOOT_MP/arch/x86_64/airootfs.sfs"
+    fi
+
     if [ "$CREATED_MP" = true ]; then
         # Safety check: Prevent deletion of critical system paths
         case "$BOOT_MP" in
@@ -326,18 +334,37 @@ main() {
     if [ "$SKIP_MOUNT" = true ]; then
         echo "Preparing to replace airootfs.sfs..."
         if remount_rw "$BOOT_MP"; then
-            if [ "$BACKUP_ORIG" = true ] && [ "$ORIG_EXISTS" = true ]; then
-                echo "Backing up original airootfs.sfs..."
-                mv "$SQFILE_FULL" "$SQFILE_FULL.old"
-            elif [ "$ORIG_EXISTS" = true ]; then
-                echo "Removing original airootfs.sfs..."
-                rm "$SQFILE_FULL"
+            # Create temporary backup for rollback protection
+            tmp_backup="$SQFILE_FULL.tmp.backup"
+            if [ "$ORIG_EXISTS" = true ]; then
+                echo "Creating temporary backup for rollback protection..."
+                if ! mv "$SQFILE_FULL" "$tmp_backup"; then
+                    echo "ERROR: Failed to create temporary backup"
+                    exit 1
+                fi
             fi
+
+            # Attempt replacement
             echo "Replacing with new airootfs.sfs..."
-            mv "$new_file" "$SQFILE_FULL"
+            if ! mv "$new_file" "$SQFILE_FULL"; then
+                echo "ERROR: Failed to move new file into place"
+                # Rollback: restore from temporary backup
+                if [ -f "$tmp_backup" ]; then
+                    echo "Rolling back: restoring original airootfs.sfs..."
+                    mv "$tmp_backup" "$SQFILE_FULL"
+                fi
+                exit 1
+            fi
+
+            # Sync to ensure file is written to disk
+            sync
+
+            # Handle MD5 checksum
             if [ "$SKIP_MD5" = false ]; then
                 echo "Updating MD5..."
-                md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"
+                if ! md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"; then
+                    echo "WARNING: MD5 calculation failed, but file replacement succeeded"
+                fi
             else
                 # Remove old MD5 file if it exists to avoid confusion
                 if [ -f "$SQFILE_FULL.md5" ]; then
@@ -345,6 +372,18 @@ main() {
                     rm -f "$SQFILE_FULL.md5"
                 fi
             fi
+
+            # Replacement succeeded - handle the backup based on user preference
+            if [ -f "$tmp_backup" ]; then
+                if [ "$BACKUP_ORIG" = true ]; then
+                    echo "Keeping backup as airootfs.sfs.old..."
+                    mv "$tmp_backup" "$SQFILE_FULL.old"
+                else
+                    echo "Removing temporary backup..."
+                    rm -f "$tmp_backup"
+                fi
+            fi
+
             if [ "$BOOT_MP" != "/" ]; then
                 # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
                 # If both are on the same device, remounting RO would freeze the entire system
