@@ -132,11 +132,36 @@ main() {
     # Set boot mount point
     BOOT_MP="/run/archiso/bootmnt"
 
-    # Check if boot device is already mounted at the expected location
-    if [ -f "$BOOT_MP/arch/x86_64/airootfs.sfs" ]; then
-        SKIP_MOUNT=true
+    # Check if boot mount point exists and is accessible
+    if [ ! -d "$BOOT_MP" ]; then
+        echo "ERROR: Boot mount point $BOOT_MP does not exist"
+        echo "This script must be run from a live Arch ISO environment"
+        exit 1
+    fi
+
+    # Check if boot mount point is actually a mountpoint (separate filesystem)
+    if ! mountpoint -q "$BOOT_MP" 2>/dev/null; then
+        echo "ERROR: $BOOT_MP is not a mounted filesystem"
+        echo "This script must be run from a live Arch ISO environment where the boot device is mounted"
+        exit 1
+    fi
+
+    # Verify boot mount point is on a different device than root
+    root_device=$(df --output=source / | tail -n1)
+    boot_device=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
+
+    if [ "$root_device" = "$boot_device" ] && [ -n "$boot_device" ]; then
+        echo "WARNING: Boot mount point appears to be on the same device as root ($root_device)"
+        echo "This is unusual for a live environment. Proceeding with caution..."
+    else
+        echo "Boot device detected: $boot_device"
+    fi
+
+    # Check if original airootfs.sfs exists
+    SQFILE_FULL="$BOOT_MP/arch/x86_64/airootfs.sfs"
+    if [ -f "$SQFILE_FULL" ]; then
         ORIG_EXISTS=true
-        echo "Found live file at $BOOT_MP/arch/x86_64/airootfs.sfs"
+        echo "Found existing airootfs.sfs at $SQFILE_FULL"
         # Ask about backup preference only if file exists and backup flag not set
         if [ -z "$BACKUP_ORIG" ]; then
             while true; do
@@ -161,70 +186,38 @@ main() {
             done
         fi
     else
-        echo "Live file not found at $BOOT_MP/arch/x86_64/airootfs.sfs"
-        SKIP_MOUNT=false
         ORIG_EXISTS=false
         BACKUP_ORIG=false
-
-        if grep -q 'archisodevice=' /proc/cmdline; then
-            BOOT_DEV=$(grep -o 'archisodevice=[^ ]*' /proc/cmdline | cut -d= -f2)
-            # Validate archisodevice value
-            if [ -z "$BOOT_DEV" ] || [[ ! "$BOOT_DEV" =~ ^/dev/ ]]; then
-                echo "ERROR: Invalid or empty archisodevice value: $BOOT_DEV"
-                exit 1
-            fi
-            echo "Found archisodevice from cmdline: $BOOT_DEV"
-        else
-            echo "No boot device found from /proc/cmdline"
-            echo "Mount your boot device to $BOOT_MP and run again, or set archisodevice= in kernel cmdline"
-            exit 1
-        fi
+        echo "No existing airootfs.sfs found (may have been deleted to save space)"
+        echo "Will create new airootfs.sfs at $SQFILE_FULL"
     fi
 
-    # Handle mounting
-    if [ "$SKIP_MOUNT" != true ]; then
-        if [ -n "$BOOT_DEV" ]; then
-            # Create mount point directory
-            mkdir -p "$BOOT_MP"
-            echo "Attempting to mount $BOOT_DEV to $BOOT_MP"
-            mount "$BOOT_DEV" "$BOOT_MP" || { echo "Cannot mount boot device $BOOT_DEV"; exit 1; }
-            echo "Mounted boot device at $BOOT_MP"
-            CREATED_MP=true
-        fi
+    # Try to remount boot mount point as read-write
+    if remount_rw "$BOOT_MP"; then
+        RW_SUCCESS=true
     else
-        # Already mounted, try to remount RW
-        if remount_rw "$BOOT_MP"; then
-            RW_SUCCESS=true
-        else
-            RW_SUCCESS=false
-        fi
+        RW_SUCCESS=false
     fi
 
-    # Path to airootfs
+    # Path to airootfs directory
     SQFILE_DIR="$BOOT_MP/arch/x86_64"
-    SQFILE_FULL="$SQFILE_DIR/airootfs.sfs"
     OUTPUT_DIR="$SQFILE_DIR"
 
     # Ensure output directory exists
     mkdir -p "$SQFILE_DIR"
 
     # Check if device is writable
-    if [ "$SKIP_MOUNT" != true ]; then
-        # We just mounted it, so it should be writable
-        RW_SUCCESS=true
-        if ! touch "$BOOT_MP/test" 2>/dev/null || ! rm "$BOOT_MP/test" 2>/dev/null; then
-            echo "ERROR: Boot device is not writable"
-            exit 1
-        fi
-    elif [ "$RW_SUCCESS" = false ]; then
-        # Already mounted, try to remount RW if needed
-        if remount_rw "$BOOT_MP"; then
-            RW_SUCCESS=true
-        else
-            echo "ERROR: Boot device is read-only and cannot be remounted"
-            echo "Please remount the device as read-write and run again"
-            exit 1
-        fi
+    if [ "$RW_SUCCESS" = false ]; then
+        echo "ERROR: Boot device is read-only and cannot be remounted"
+        echo "Please remount the device as read-write and run again"
+        exit 1
+    fi
+
+    # Verify write access
+    if ! touch "$BOOT_MP/.write_test" 2>/dev/null || ! rm "$BOOT_MP/.write_test" 2>/dev/null; then
+        echo "ERROR: Boot device is not writable"
+        echo "Check permissions and filesystem status"
+        exit 1
     fi
 
     # Get sizes - calculate uncompressed size only for included directories
@@ -330,79 +323,77 @@ main() {
         exit 0
     fi
 
-    # For live systems, handle replacement based on backup preference
-    if [ "$SKIP_MOUNT" = true ]; then
-        echo "Preparing to replace airootfs.sfs..."
-        if remount_rw "$BOOT_MP"; then
-            # Create temporary backup for rollback protection
-            tmp_backup="$SQFILE_FULL.tmp.backup"
-            if [ "$ORIG_EXISTS" = true ]; then
-                echo "Creating temporary backup for rollback protection..."
-                if ! mv "$SQFILE_FULL" "$tmp_backup"; then
-                    echo "ERROR: Failed to create temporary backup"
-                    exit 1
-                fi
-            fi
-
-            # Attempt replacement
-            echo "Replacing with new airootfs.sfs..."
-            if ! mv "$new_file" "$SQFILE_FULL"; then
-                echo "ERROR: Failed to move new file into place"
-                # Rollback: restore from temporary backup
-                if [ -f "$tmp_backup" ]; then
-                    echo "Rolling back: restoring original airootfs.sfs..."
-                    mv "$tmp_backup" "$SQFILE_FULL"
-                fi
+    # Handle replacement based on backup preference
+    echo "Preparing to replace airootfs.sfs..."
+    if remount_rw "$BOOT_MP"; then
+        # Create temporary backup for rollback protection
+        tmp_backup="$SQFILE_FULL.tmp.backup"
+        if [ "$ORIG_EXISTS" = true ]; then
+            echo "Creating temporary backup for rollback protection..."
+            if ! mv "$SQFILE_FULL" "$tmp_backup"; then
+                echo "ERROR: Failed to create temporary backup"
                 exit 1
             fi
+        fi
 
-            # Sync to ensure file is written to disk
-            sync
-
-            # Handle MD5 checksum
-            if [ "$SKIP_MD5" = false ]; then
-                echo "Updating MD5..."
-                if ! md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"; then
-                    echo "WARNING: MD5 calculation failed, but file replacement succeeded"
-                fi
-            else
-                # Remove old MD5 file if it exists to avoid confusion
-                if [ -f "$SQFILE_FULL.md5" ]; then
-                    echo "Removing old MD5 file..."
-                    rm -f "$SQFILE_FULL.md5"
-                fi
-            fi
-
-            # Replacement succeeded - handle the backup based on user preference
+        # Attempt replacement
+        echo "Replacing with new airootfs.sfs..."
+        if ! mv "$new_file" "$SQFILE_FULL"; then
+            echo "ERROR: Failed to move new file into place"
+            # Rollback: restore from temporary backup
             if [ -f "$tmp_backup" ]; then
-                if [ "$BACKUP_ORIG" = true ]; then
-                    echo "Keeping backup as airootfs.sfs.old..."
-                    mv "$tmp_backup" "$SQFILE_FULL.old"
-                else
-                    echo "Removing temporary backup..."
-                    rm -f "$tmp_backup"
-                fi
+                echo "Rolling back: restoring original airootfs.sfs..."
+                mv "$tmp_backup" "$SQFILE_FULL"
             fi
-
-            if [ "$BOOT_MP" != "/" ]; then
-                # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
-                # If both are on the same device, remounting RO would freeze the entire system
-                root_device=$(df --output=source / | tail -n1)
-                boot_device=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
-                # Safe to remount RO only if: different devices OR df failed to detect boot device
-                if [ "$root_device" != "$boot_device" ] || [ -z "$boot_device" ]; then
-                    echo "Remounting $BOOT_MP RO..."
-                    mount -o remount,ro "$BOOT_MP"
-                else
-                    echo "WARNING: Skipping RO remount (boot on same device as root: $root_device)"
-                fi
-            fi
-            echo "Replacement complete. Reboot to test the new system."
-        else
-            echo "ERROR: Failed to remount $BOOT_MP RW for replacement"
-            echo "Please manually replace: cp $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
             exit 1
         fi
+
+        # Sync to ensure file is written to disk
+        sync
+
+        # Handle MD5 checksum
+        if [ "$SKIP_MD5" = false ]; then
+            echo "Updating MD5..."
+            if ! md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"; then
+                echo "WARNING: MD5 calculation failed, but file replacement succeeded"
+            fi
+        else
+            # Remove old MD5 file if it exists to avoid confusion
+            if [ -f "$SQFILE_FULL.md5" ]; then
+                echo "Removing old MD5 file..."
+                rm -f "$SQFILE_FULL.md5"
+            fi
+        fi
+
+        # Replacement succeeded - handle the backup based on user preference
+        if [ -f "$tmp_backup" ]; then
+            if [ "$BACKUP_ORIG" = true ]; then
+                echo "Keeping backup as airootfs.sfs.old..."
+                mv "$tmp_backup" "$SQFILE_FULL.old"
+            else
+                echo "Removing temporary backup..."
+                rm -f "$tmp_backup"
+            fi
+        fi
+
+        if [ "$BOOT_MP" != "/" ]; then
+            # Verify $BOOT_MP is not on the root filesystem to avoid locking up the system
+            # If both are on the same device, remounting RO would freeze the entire system
+            root_device=$(df --output=source / | tail -n1)
+            boot_device=$(df --output=source "$BOOT_MP" 2>/dev/null | tail -n1)
+            # Safe to remount RO only if: different devices OR df failed to detect boot device
+            if [ "$root_device" != "$boot_device" ] || [ -z "$boot_device" ]; then
+                echo "Remounting $BOOT_MP RO..."
+                mount -o remount,ro "$BOOT_MP"
+            else
+                echo "WARNING: Skipping RO remount (boot on same device as root: $root_device)"
+            fi
+        fi
+        echo "Replacement complete. Reboot to test the new system."
+    else
+        echo "ERROR: Failed to remount $BOOT_MP RW for replacement"
+        echo "Please manually replace: cp $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+        exit 1
     fi
 }
 
