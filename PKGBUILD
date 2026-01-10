@@ -14,8 +14,22 @@ optdepends=(
     'xorriso: for iso-remaster'
     'md5sum: for iso-remaster and live-remaster'
 )
-source=()
-md5sums=()
+source=(
+    'iso-remaster'
+    'live-remaster'
+    'update-cow-space'
+    'docs/iso-remaster.1'
+    'docs/live-remaster.1'
+    'docs/update-cow-space.1'
+)
+md5sums=(
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+    'SKIP'
+)
 
 package() {
     cd "$srcdir"
