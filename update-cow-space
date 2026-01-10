@@ -135,10 +135,22 @@ echo "Backed up GRUB config to $GRUB_CFG.bak"
 # Update GRUB config: add cow_spacesize if not present
 if grep -q "cow_spacesize" "$GRUB_CFG"; then
     echo "cow_spacesize already present, updating..."
-    sed -i "s/cow_spacesize=[^ ]*/cow_spacesize=$COW_SIZE/" "$GRUB_CFG"
+    if ! sed -i "s/cow_spacesize=[^ ]*/cow_spacesize=$COW_SIZE/" "$GRUB_CFG"; then
+        fatal "Failed to update cow_spacesize in GRUB config"
+    fi
 else
     echo "Adding cow_spacesize parameter..."
-    sed -i "/^linux / s|$| cow_spacesize=$COW_SIZE|" "$GRUB_CFG"
+    if ! sed -i "/linux / s|$| cow_spacesize=$COW_SIZE|" "$GRUB_CFG"; then
+        fatal "Failed to add cow_spacesize to GRUB config"
+    fi
+fi
+
+# Verify the update
+if ! grep -q "cow_spacesize=$COW_SIZE" "$GRUB_CFG"; then
+    echo "Warning: cow_spacesize may not have been added correctly."
+    echo "Current linux line(s):"
+    grep "linux" "$GRUB_CFG" || echo "No linux line found"
+    fatal "Verification failed: cow_spacesize not found in config"
 fi
 
 echo "Updated GRUB config with cow_spacesize=$COW_SIZE"
