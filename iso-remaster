@@ -201,18 +201,19 @@ elif [[ $AVAIL_MB -lt $REQUIRED_MB ]]; then
     fatal "Insufficient disk space: need ${REQUIRED_MB}MB, have ${AVAIL_MB}MB in $WORK"
 fi
 
-echo "$ME: building squashfs ($COMP) from $FROM -> $SFS"
-
 rm -f "$SFS"
 args=(-comp "$COMP" "${EXTRA[@]}")
 for excl in "${EXCLUDES[@]}"; do
     args+=(-e "$excl")
 done
 if [[ $VERBOSE == true ]]; then
+    echo "$ME: building squashfs ($COMP) from $FROM -> $SFS"
     mksquashfs "$FROM" "$SFS" "${args[@]}"
 else
     # Suppress progress output but preserve error messages (stderr)
+    echo "$ME: building squashfs ($COMP) from $FROM -> $SFS (this may take several minutes)..."
     mksquashfs "$FROM" "$SFS" "${args[@]}" 1>/dev/null
+    echo "$ME: squashfs creation complete"
 fi
 
 if [[ $SKIP_MD5 == false ]]; then
@@ -235,12 +236,14 @@ menuentry "${LABEL} (${ARCH})" {
 }
 GRUBCFG
 
-echo "$ME: creating ISO -> $OUT"
 if [[ $VERBOSE == true ]]; then
+    echo "$ME: creating ISO -> $OUT"
     grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR"
 else
     # Suppress progress output but preserve error messages (stderr)
+    echo "$ME: creating ISO -> $OUT (this may take a few minutes)..."
     grub-mkrescue -o "$OUT" -volid "$LABEL" "$ISO_DIR" 1>/dev/null
+    echo "$ME: ISO creation complete"
 fi
 
-echo "$ME: done"
+echo "$ME: done -> $OUT"
