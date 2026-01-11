@@ -1,4 +1,23 @@
 #!/usr/bin/env bash
+#
+# Copyright (C) 2026 Adrian <adrian@mxlinux.org>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+# Version
+VERSION="26.01"
+
 set -uo pipefail
 
 ME=${0##*/}
@@ -27,8 +46,9 @@ Options:
   --kernel <path>      Default: <from>/boot/vmlinuz-linux
   --initrd <path>      Default: <from>/boot/archiso.img
    --no-copytoram       Do not include copytoram in grub cmdline
-   -m|--no-md5sum       Skip MD5 checksum calculation (can be stacked)
-   -q|--quiet           Suppress progress output (run quietly)
+    -m|--no-md5sum       Skip MD5 checksum calculation (can be stacked)
+    -q|--quiet           Suppress progress output (run quietly)
+    -v|--version         Show version information
 
 Examples:
   sudo iso-remaster --out ./archlive.iso --label ARCHLIVE
@@ -36,11 +56,17 @@ Examples:
 USAGE
 }
 
-# Allow help without root privileges
-if [[ $# -gt 0 && ($1 == "-h" || $1 == "--help") ]]; then
-    usage
-    exit 0
-fi
+# Check for non-elevated options first
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    -v|--version)
+        echo "iso-remaster v$VERSION"
+        exit 0
+        ;;
+esac
 
 # Ensure standard paths are in PATH for tools like xorriso
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"
@@ -80,6 +106,7 @@ GRUB_THEME=
 while (( $# )); do
     case $1 in
         -h|--help) usage; exit 0 ;;
+        -v|--version) echo "iso-remaster v$VERSION"; exit 0 ;;
         --from) FROM=${2:-}; FROM_PROVIDED=true; shift 2 ;;
         --out) OUT=${2:-}; shift 2 ;;
         --arch) ARCH=${2:-}; shift 2 ;;

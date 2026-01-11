@@ -1,6 +1,6 @@
 .\" Manpage for live-remaster
-.\" Contact adrian@example.com for bug reports
-.TH LIVE-REMASTER 1 "2025-01-09" "arch-remaster" "User Commands"
+.\" Contact adrian@mxlinux.org for bug reports
+.TH LIVE-REMASTER 1 "2026-01-09" "arch-remaster" "User Commands"
 
 .SH NAME
 live-remaster \- Regenerate airootfs.sfs on a running Arch Linux live system
@@ -30,17 +30,17 @@ Use xz compression (short option, stackable)
 .BR -z
 Use zstd compression (short option, stackable)
 .TP
-.BR -v
-Display version information (short option)
+.BR -h , --help
+Display help information
+.TP
+.BR -v , --version
+Display version information
 .TP
 .BR -b , --no-backup
 Skip backing up the original airootfs.sfs. Without this option, you will be prompted to backup if the file exists
 .TP
 .BR -m , --no-md5sum
 Skip MD5 checksum calculation. Can be stacked with other short options
-.TP
-.BR -v , --version
-Display version information
 
 .SH USAGE NOTES
 
@@ -100,6 +100,14 @@ Display version:
 .fi
 .RE
 
+Display help:
+.RS
+.PP
+.nf
+./live-remaster -h
+.fi
+.RE
+
 Use long options:
 .RS
 .PP
@@ -117,7 +125,7 @@ mksquashfs, md5sum
 20 MiB is reserved as a safety margin when checking available space on the boot device.
 
 .SH AUTHOR
-Written for the arch-remaster project. Adapted from antiX live-remaster for Arch Linux.
+Written by Adrian <adrian@mxlinux.org> for the arch-remaster project. Adapted from antiX live-remaster for Arch Linux.
 
 .SH REPORTING BUGS
 Report issues at the arch-remaster project repository.
