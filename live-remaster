@@ -28,6 +28,7 @@ VERSION="26.01"
 BACKUP_ORIG=
 SKIP_MD5=false
 CREATED_MP=false
+SAFETY_MARGIN_MIB=20
 
 # Check for non-elevated options first
 case "$1" in
@@ -404,6 +405,18 @@ main() {
 
     sq_new_size=$(du_size "$new_file")
     echo "New airootfs created: $new_file ($(fmt_size "$sq_new_size"))"
+
+    # Enforce safety margin before replacing the original image
+    boot_avail_after_build=$(free_space "$BOOT_MP")
+    if [ "$boot_avail_after_build" -lt "$SAFETY_MARGIN_MIB" ]; then
+        echo "WARNING: Insufficient free space for safe in-place replacement."
+        echo "Free space: $(fmt_size "$boot_avail_after_build"), required safety margin: $(fmt_size "$SAFETY_MARGIN_MIB")"
+        echo "Leaving new image at $new_file for manual replacement."
+        echo "Manual steps:"
+        echo "  1) Replace $SQFILE_FULL with $new_file"
+        echo "  2) Regenerate checksum: (cd $SQFILE_DIR && sha512sum airootfs.sfs > airootfs.sha512)"
+        exit 0
+    fi
 
     # Handle replacement based on backup preference
     echo "Preparing to replace airootfs.sfs..."
