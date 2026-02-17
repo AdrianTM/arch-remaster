@@ -391,7 +391,7 @@ main() {
 
     # Run mksquashfs
     echo "Creating new airootfs.sfs... This may take a while."
-    if mksquashfs / "$tmp_file" -comp "$COMP_TYPE" -wildcards -ef "$exclude_file"; then
+    if mksquashfs / "$tmp_file" -comp "$COMP_TYPE" -wildcards -one-file-system -ef "$exclude_file"; then
         echo "mksquashfs succeeded"
     else
         echo "mksquashfs failed"
