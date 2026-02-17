@@ -32,7 +32,7 @@ CREATED_MP=false
 # Check for non-elevated options first
 case "$1" in
     -h|--help)
-        echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum] [-v|--version] [-h|--help]"
+        echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-checksum|--no-md5sum] [-v|--version] [-h|--help]"
         echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
         exit 0
         ;;
@@ -123,6 +123,49 @@ remount_rw() {
     fi
 }
 
+# Function to find and mount a live boot partition containing arch/x86_64
+find_live_partition() {
+    local label
+    local dev
+    local devices=""
+    local tmp_mount="/tmp/archiso_boot"
+
+    # Common labels seen on Arch-based live media
+    for label in MXarch-Live ARCHISO_EFI LIVE-UEFI; do
+        for dev in $(blkid -l -t LABEL="$label" -o device 2>/dev/null); do
+            case " $devices " in
+                *" $dev "*) ;;
+                *) devices="$devices $dev" ;;
+            esac
+        done
+    done
+
+    # Official Arch ISO labels look like ARCH_YYYYMM
+    for dev in $(blkid 2>/dev/null | awk -F: '/LABEL="ARCH_[0-9]{6}"/ {print $1}'); do
+        case " $devices " in
+            *" $dev "*) ;;
+            *) devices="$devices $dev" ;;
+        esac
+    done
+
+    mkdir -p "$tmp_mount"
+
+    for dev in $devices; do
+        if mount "$dev" "$tmp_mount" 2>/dev/null; then
+            if [ -d "$tmp_mount/arch/x86_64" ]; then
+                BOOT_MP="$tmp_mount"
+                CREATED_MP=true
+                echo "Mounted live boot partition ($dev) at $BOOT_MP"
+                return 0
+            fi
+            umount "$tmp_mount" 2>/dev/null || true
+        fi
+    done
+
+    rm -rf "$tmp_mount"
+    return 1
+}
+
 # Function to check for required dependencies
 check_dependencies() {
     local missing=""
@@ -132,9 +175,9 @@ check_dependencies() {
         missing="$missing mksquashfs"
     fi
 
-    # Check for md5sum (only if not skipped)
-    if [ "$SKIP_MD5" = false ] && ! command -v md5sum >/dev/null 2>&1; then
-        missing="$missing md5sum"
+    # Check for sha512sum (only if checksum is not skipped)
+    if [ "$SKIP_MD5" = false ] && ! command -v sha512sum >/dev/null 2>&1; then
+        missing="$missing sha512sum"
     fi
 
     if [ -n "$missing" ]; then
@@ -160,24 +203,19 @@ main() {
     # Check for copytoram mode and handle boot partition mounting
     if [ -f "/run/archiso/copytoram/airootfs.sfs" ]; then
         echo "Detected copytoram mode. Attempting to mount boot partition for writing."
-        # Try to find MXarch-Live partition
-        LIVE_PART=$(blkid -l -t LABEL=MXarch-Live -o device 2>/dev/null)
-        if [ -n "$LIVE_PART" ]; then
-            TMP_MOUNT="/tmp/archiso_boot"
-            mkdir -p "$TMP_MOUNT"
-            if mount "$LIVE_PART" "$TMP_MOUNT" 2>/dev/null; then
-                BOOT_MP="$TMP_MOUNT"
-                CREATED_MP=true
-                echo "Mounted MXarch-Live partition at $BOOT_MP"
-            else
-                echo "Failed to mount MXarch-Live partition $LIVE_PART"
-            fi
+        if mountpoint -q "$BOOT_MP" 2>/dev/null && [ -d "$BOOT_MP/arch/x86_64" ]; then
+            echo "Using existing boot mount point: $BOOT_MP"
+        elif ! find_live_partition; then
+            echo "Could not auto-detect a live boot partition."
+            echo "Tried labels: ARCH_YYYYMM, ARCHISO_EFI, LIVE-UEFI, MXarch-Live"
+            echo "Partition must contain arch/x86_64/"
         else
-            echo "Could not find MXarch-Live partition with label MXarch-Live"
+            echo "Auto-detected boot partition at $BOOT_MP"
         fi
+
         if [ "$BOOT_MP" = "/run/archiso/bootmnt" ]; then
             # Ask user to provide mount point
-            read -rp "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
+            read -rp "Please mount the live USB partition containing arch/x86_64 and provide the mount path: " USER_MP
             if [ -d "$USER_MP" ] && [ -d "$USER_MP/arch" ] && [ -d "$USER_MP/arch/x86_64" ]; then
                 BOOT_MP="$USER_MP"
                 echo "Using user-provided mount point: $BOOT_MP"
@@ -395,17 +433,19 @@ main() {
         # Sync to ensure file is written to disk
         sync
 
-        # Handle MD5 checksum
+        checksum_file="$SQFILE_DIR/airootfs.sha512"
+
+        # Handle checksum
         if [ "$SKIP_MD5" = false ]; then
-            echo "Updating MD5..."
-            if ! md5sum "$SQFILE_FULL" > "$SQFILE_FULL.md5"; then
-                echo "WARNING: MD5 calculation failed, but file replacement succeeded"
+            echo "Updating SHA-512 checksum..."
+            if ! (cd "$SQFILE_DIR" && sha512sum "airootfs.sfs" > "airootfs.sha512"); then
+                echo "WARNING: SHA-512 calculation failed, but file replacement succeeded"
             fi
         else
-            # Remove old MD5 file if it exists to avoid confusion
-            if [ -f "$SQFILE_FULL.md5" ]; then
-                echo "Removing old MD5 file..."
-                rm -f "$SQFILE_FULL.md5"
+            # Remove old checksum files if they exist to avoid confusion
+            if [ -f "$checksum_file" ] || [ -f "$SQFILE_FULL.md5" ]; then
+                echo "Removing old checksum file(s)..."
+                rm -f "$checksum_file" "$SQFILE_FULL.md5"
             fi
         fi
 
@@ -436,7 +476,7 @@ main() {
         echo "Replacement complete. Reboot to test the new system."
     else
         echo "ERROR: Failed to remount $BOOT_MP RW for replacement"
-        echo "Please manually replace: cp $new_file $SQFILE_FULL && md5sum $SQFILE_FULL > $SQFILE_FULL.md5"
+        echo "Please manually replace: cp $new_file $SQFILE_FULL && (cd $SQFILE_DIR && sha512sum airootfs.sfs > airootfs.sha512)"
         exit 1
     fi
 }
@@ -445,7 +485,7 @@ main() {
 while [ $# -gt 0 ]; do
     case $1 in
         -h|--help)
-            echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum] [-v|--version] [-h|--help]"
+            echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-checksum|--no-md5sum] [-v|--version] [-h|--help]"
             echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
             exit 0
             ;;
@@ -467,7 +507,7 @@ while [ $# -gt 0 ]; do
             BACKUP_ORIG=false
             shift
             ;;
-        --no-md5sum)
+        --no-checksum|--no-md5sum)
             SKIP_MD5=true
             shift
             ;;
@@ -498,7 +538,7 @@ while [ $# -gt 0 ]; do
                         SKIP_MD5=true
                         ;;
                     *)
-                        echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum] [-v|--version] [-h|--help]"
+                        echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-checksum|--no-md5sum] [-v|--version] [-h|--help]"
                         echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
                         exit 1
                         ;;
@@ -508,7 +548,7 @@ while [ $# -gt 0 ]; do
             shift
             ;;
         *)
-            echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-md5sum] [-v|--version] [-h|--help]"
+            echo "Usage: $0 [-c|--comp compression_type] [-g|l|x|z] [-b|--no-backup] [-m|--no-checksum|--no-md5sum] [-v|--version] [-h|--help]"
             echo "Supported compression: gzip(-g), lz4(-l), xz(-x), zstd(-z)"
             exit 1
             ;;

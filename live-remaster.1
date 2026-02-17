@@ -16,7 +16,7 @@ live-remaster recreates the compressed squashfs root filesystem on a running Arc
 
 .TP
 .BR -c , --comp <type>
-Compression algorithm (default: zstd). Supported: gzip, lzma, lzo, lz4, xz, zstd
+Compression algorithm (default: zstd). Supported: gzip, lz4, xz, zstd
 .TP
 .BR -g
 Use gzip compression (short option, stackable)
@@ -39,8 +39,10 @@ Display version information
 .BR -b , --no-backup
 Skip backing up the original airootfs.sfs. Without this option, you will be prompted to backup if the file exists
 .TP
-.BR -m , --no-md5sum
-Skip MD5 checksum calculation. Can be stacked with other short options
+.BR -m , --no-checksum , --no-md5sum
+Skip checksum calculation. By default, the script writes
+.I airootfs.sha512
+using SHA-512. Can be stacked with other short options
 
 .SH USAGE NOTES
 
@@ -49,7 +51,9 @@ The script should be run from a live Arch ISO booted system. It will:
 
 .RS
 .IP 1.
-Detect if the live boot device is mounted at /run/archiso/bootmnt
+Detect if the live boot device is mounted at /run/archiso/bootmnt.
+In copytoram mode, it attempts auto-detection via labels
+ARCH_YYYYMM, ARCHISO_EFI, LIVE-UEFI, and MXarch-Live
 .IP 2.
 Calculate the size of the uncompressed root filesystem
 .IP 3.
@@ -84,7 +88,7 @@ sudo ./live-remaster -x -b
 .fi
 .RE
 
-Stackable options (xz, no backup, no MD5):
+Stackable options (xz, no backup, no checksum):
 .RS
 .PP
 .nf
@@ -112,14 +116,14 @@ Use long options:
 .RS
 .PP
 .nf
-sudo ./live-remaster --comp gzip --no-backup --no-md5sum
+sudo ./live-remaster --comp gzip --no-backup --no-checksum
 .fi
 .RE
 
 .SH REQUIREMENTS
 The following programs must be available:
 .br
-mksquashfs, md5sum
+mksquashfs, sha512sum
 
 .SH SAFETY MARGIN
 20 MiB is reserved as a safety margin when checking available space on the boot device.
