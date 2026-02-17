@@ -113,7 +113,7 @@ else
     else
         echo "Failed to mount ESP $ESP_PART"
         # Ask user to provide mount point
-        read -p "Please mount the ESP ($ESP_PART) and provide the mount path: " USER_MP
+        read -rp "Please mount the ESP ($ESP_PART) and provide the mount path: " USER_MP
         if [ -d "$USER_MP" ] && [ -d "$USER_MP/boot" ] && [ -f "$USER_MP/boot/grub/grub.cfg" ]; then
             MOUNT_POINT="$USER_MP"
             echo "Using user-provided mount point: $MOUNT_POINT"

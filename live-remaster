@@ -24,9 +24,6 @@ COMP_TYPE="zstd"
 # Version
 VERSION="26.01"
 
-# Safety margin
-SAFETY_MARGIN=20
-
 # Default settings
 BACKUP_ORIG=
 SKIP_MD5=false
@@ -180,7 +177,7 @@ main() {
         fi
         if [ "$BOOT_MP" = "/run/archiso/bootmnt" ]; then
             # Ask user to provide mount point
-            read -p "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
+            read -rp "Please mount the boot partition (EFI) of the flash drive and provide the mount path: " USER_MP
             if [ -d "$USER_MP" ] && [ -d "$USER_MP/arch" ] && [ -d "$USER_MP/arch/x86_64" ]; then
                 BOOT_MP="$USER_MP"
                 echo "Using user-provided mount point: $BOOT_MP"
@@ -224,7 +221,7 @@ main() {
         # Ask about backup preference only if file exists and backup flag not set
         if [ -z "$BACKUP_ORIG" ]; then
             while true; do
-                if ! read -p "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE; then
+                if ! read -rp "Backup original airootfs.sfs before replacing? (Y/n): " BACKUP_CHOICE; then
                     echo "EOF detected, defaulting to no backup."
                     BACKUP_ORIG=false
                     break
@@ -308,7 +305,7 @@ main() {
 
     if [ "$ORIG_EXISTS" = true ]; then
         sq_old_size=$(du_size "$SQFILE_FULL")
-        echo "Original airootfs size: $(fmt_size $sq_old_size)"
+        echo "Original airootfs size: $(fmt_size "$sq_old_size")"
     else
         sq_old_size=0
         echo "No original airootfs to compare"
@@ -318,23 +315,24 @@ main() {
     boot_total=$(all_space "$BOOT_MP")
     boot_avail=$(free_space "$BOOT_MP")
 
-    echo "Boot device total: $(fmt_size $boot_total)"
-    echo "Boot device free: $(fmt_size $boot_avail)"
+    echo "Boot device total: $(fmt_size "$boot_total")"
+    echo "Boot device free: $(fmt_size "$boot_avail")"
 
     echo "Using compression: $COMP_TYPE"
 
     # Create exclude file
     exclude_file="/tmp/remaster.exclude"
-    > "$exclude_file"
-    for excl in $excludes; do
-        echo "$excl" >> "$exclude_file"
-    done
-    # Handle /run specially - preserve archiso directory and exclude everything else in /run
-    # Add exclusions for /run - order matters: negations first, then broad exclusions
-    # Using negation patterns to ensure /run/archiso is included despite excluding run/*
-    echo "!run/archiso" >> "$exclude_file"
-    echo "!run/archiso/*" >> "$exclude_file"
-    echo "run/*" >> "$exclude_file"
+    {
+        for excl in $excludes; do
+            echo "$excl"
+        done
+        # Handle /run specially - preserve archiso directory and exclude everything else in /run
+        # Add exclusions for /run - order matters: negations first, then broad exclusions
+        # Using negation patterns to ensure /run/archiso is included despite excluding run/*
+        echo "!run/archiso"
+        echo "!run/archiso/*"
+        echo "run/*"
+    } > "$exclude_file"
 
     mkdir -p "$OUTPUT_DIR"
     # Temp file
@@ -352,12 +350,9 @@ main() {
         echo "Created /run/archiso/bootmnt directory"
     fi
 
-    # Compression options
-    OTHER_OPTS="-comp $COMP_TYPE"
-
     # Run mksquashfs
     echo "Creating new airootfs.sfs... This may take a while."
-    if mksquashfs / "$tmp_file" $OTHER_OPTS -wildcards -ef "$exclude_file"; then
+    if mksquashfs / "$tmp_file" -comp "$COMP_TYPE" -wildcards -ef "$exclude_file"; then
         echo "mksquashfs succeeded"
     else
         echo "mksquashfs failed"
@@ -370,7 +365,7 @@ main() {
     mv "$tmp_file" "$new_file"
 
     sq_new_size=$(du_size "$new_file")
-    echo "New airootfs created: $new_file ($(fmt_size $sq_new_size))"
+    echo "New airootfs created: $new_file ($(fmt_size "$sq_new_size"))"
 
     # Handle replacement based on backup preference
     echo "Preparing to replace airootfs.sfs..."
@@ -463,7 +458,7 @@ while [ $# -gt 0 ]; do
             shift 2
             # Validate compression type
             valid_comps="gzip lz4 xz zstd"
-            if [[ ! " $valid_comps " =~ " $COMP_TYPE " ]]; then
+            if [[ ! " $valid_comps " =~ \ $COMP_TYPE\  ]]; then
                 echo "ERROR: Unsupported compression type: $COMP_TYPE. Supported: $valid_comps"
                 exit 1
             fi
