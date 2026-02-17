@@ -498,6 +498,10 @@ while [ $# -gt 0 ]; do
             exit 0
             ;;
         -c|--comp)
+            if [ $# -lt 2 ] || [ -z "$2" ] || [[ "$2" == -* ]]; then
+                echo "ERROR: --comp requires an argument. Supported: gzip, lz4, xz, zstd"
+                exit 1
+            fi
             COMP_TYPE="$2"
             shift 2
             # Validate compression type
