@@ -365,11 +365,7 @@ main() {
         for excl in $excludes; do
             echo "$excl"
         done
-        # Handle /run specially - preserve archiso directory and exclude everything else in /run
-        # Add exclusions for /run - order matters: negations first, then broad exclusions
-        # Using negation patterns to ensure /run/archiso is included despite excluding run/*
-        echo "!run/archiso"
-        echo "!run/archiso/*"
+        # Exclude runtime /run content from the live session
         echo "run/*"
     } > "$exclude_file"
 
@@ -378,20 +374,15 @@ main() {
     tmp_file="$OUTPUT_DIR/airootfs.sfs.tmp"
     new_file="$OUTPUT_DIR/airootfs.sfs.new"
 
-    # Ensure /run/archiso directory structure exists in the filesystem
-    # These directories are needed as mount points during boot
-    if [ ! -d "/run/archiso" ]; then
-        mkdir -p /run/archiso
-        echo "Created /run/archiso directory for mount point"
-    fi
-    if [ ! -d "/run/archiso/bootmnt" ]; then
-        mkdir -p /run/archiso/bootmnt
-        echo "Created /run/archiso/bootmnt directory"
-    fi
-
     # Run mksquashfs
     echo "Creating new airootfs.sfs... This may take a while."
-    if mksquashfs / "$tmp_file" -comp "$COMP_TYPE" -wildcards -one-file-system -ef "$exclude_file"; then
+    if mksquashfs / "$tmp_file" \
+        -comp "$COMP_TYPE" \
+        -wildcards \
+        -one-file-system \
+        -ef "$exclude_file" \
+        -p "run/archiso d 755 0 0" \
+        -p "run/archiso/bootmnt d 755 0 0"; then
         echo "mksquashfs succeeded"
     else
         echo "mksquashfs failed"

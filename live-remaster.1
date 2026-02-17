@@ -65,7 +65,7 @@ Optionally backup and replace the original airootfs.sfs
 .SH EXCLUDED DIRECTORIES
 The following directories are excluded from the squashfs:
 .br
-proc, sys, dev, tmp, mnt, media, lost+found, var/tmp, var/log, var/cache, var/lib/pacman/sync, run/* (except run/archiso)
+proc, sys, dev, tmp, mnt, media, lost+found, var/tmp, var/log, var/cache, var/lib/pacman/sync, run/*
 
 .SH SPACE REQUIREMENTS
 The script checks available space on the boot device before replacing the original file. A safety margin of 20 MiB is included. If insufficient space exists, the new file is left as airootfs.sfs.new for manual replacement.
