@@ -2,7 +2,7 @@
 
 pkgname=arch-remaster
 pkgver=26.01
-pkgrel=1
+pkgrel=2
 pkgdesc="Tools for remastering Arch Linux live systems and updating live USB GRUB configs"
 arch=('any')
 url="https://github.com/AdrianTM/arch-remaster"
@@ -10,7 +10,6 @@ license=('GPL')
 depends=('bash' 'coreutils' 'util-linux' 'grep' 'sed')
 optdepends=(
     'squashfs-tools: for live-remaster'
-    'md5sum: for live-remaster'
 )
 source=(
     'live-remaster'
