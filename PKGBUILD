@@ -1,8 +1,8 @@
 # Maintainer: Adrian <adrian@mxlinux.org>
 
 pkgname=arch-remaster
-pkgver=26.01
-pkgrel=2
+pkgver=26.02
+pkgrel=1
 pkgdesc="Tools for remastering Arch Linux live systems and updating live USB GRUB configs"
 arch=('any')
 url="https://github.com/AdrianTM/arch-remaster"
