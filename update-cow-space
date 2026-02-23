@@ -169,9 +169,10 @@ else
     rm -f "$MOUNT_POINT/.test_write"
 fi
 
-# Backup GRUB config
-cp "$GRUB_CFG" "$GRUB_CFG.bak"
-echo "Backed up GRUB config to $GRUB_CFG.bak"
+# Backup GRUB config (unique per run)
+BACKUP_GRUB_CFG="$GRUB_CFG.bak.$(date +%Y%m%d-%H%M%S).$$"
+cp "$GRUB_CFG" "$BACKUP_GRUB_CFG"
+echo "Backed up GRUB config to $BACKUP_GRUB_CFG"
 
 # Update GRUB config only on boot linux lines.
 # For each linux line: replace existing cow_spacesize, otherwise append it.
