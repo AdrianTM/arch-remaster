@@ -47,6 +47,7 @@ USAGE
 
 # Parse options and arguments
 COW_SIZE=""
+ORIG_ARGS=("$@")
 while [ $# -gt 0 ]; do
     case $1 in
         -h|--help) usage; exit 0 ;;
@@ -76,7 +77,7 @@ fi
 
 # Check for root privileges and self-elevate if needed
 if [ "$(id -u)" -ne 0 ]; then
-    exec sudo "$0" "$@"
+    exec sudo "$0" "${ORIG_ARGS[@]}"
 fi
 
 # Check if running in live environment
@@ -91,6 +92,9 @@ ESP_PART=$(blkid -l -t LABEL="$ESP_LABEL" -o device 2>/dev/null)
 if [ -z "$ESP_PART" ]; then
     # Fallback to ARCHISO_EFI
     ESP_PART=$(blkid -l -t LABEL=ARCHISO_EFI -o device 2>/dev/null)
+fi
+if [ -z "$ESP_PART" ]; then
+    ESP_PART=$(blkid -l -t LABEL=MXarch-Live -o device 2>/dev/null)
 fi
 if [ -z "$ESP_PART" ]; then
     fatal "Could not find ESP partition with labels LIVE-UEFI, ARCHISO_EFI, or MXarch-Live"
@@ -160,7 +164,7 @@ if grep -q "cow_spacesize" "$GRUB_CFG"; then
     fi
 else
     echo "Adding cow_spacesize parameter..."
-    if ! sed -i "/linux / s|$| cow_spacesize=$COW_SIZE|" "$GRUB_CFG"; then
+    if ! sed -i "/^[[:space:]]*linux / s|$| cow_spacesize=$COW_SIZE|" "$GRUB_CFG"; then
         fatal "Failed to add cow_spacesize to GRUB config"
     fi
 fi
