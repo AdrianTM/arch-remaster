@@ -32,6 +32,7 @@ SAFETY_MARGIN_MIB=20
 BOOT_MP=
 OUTPUT_DIR=
 LEAVE_NEW_FILE=false
+EXCLUDE_FILE=
 
 # Check for non-elevated options first
 case "$1" in
@@ -76,7 +77,7 @@ cleanup() {
         fi
     fi
     [ -n "$OUTPUT_DIR" ] && [ "$LEAVE_NEW_FILE" != true ] && rm -f "$OUTPUT_DIR/airootfs.sfs.new"
-    rm -rf "/tmp/remaster.exclude"
+    [ -n "$EXCLUDE_FILE" ] && rm -f "$EXCLUDE_FILE"
 }
 trap cleanup EXIT
 
@@ -345,14 +346,17 @@ main() {
     echo "Using compression: $COMP_TYPE"
 
     # Create exclude file
-    exclude_file="/tmp/remaster.exclude"
+    EXCLUDE_FILE=$(mktemp /tmp/remaster.exclude.XXXXXX) || {
+        echo "ERROR: Failed to create temporary exclude file"
+        exit 1
+    }
     {
         for excl in $excludes; do
             echo "$excl"
         done
         # Exclude runtime /run content from the live session
         echo "run/*"
-    } > "$exclude_file"
+    } > "$EXCLUDE_FILE"
 
     mkdir -p "$OUTPUT_DIR"
     # Temp file
@@ -365,7 +369,7 @@ main() {
         -comp "$COMP_TYPE" \
         -wildcards \
         -one-file-system \
-        -ef "$exclude_file" \
+        -ef "$EXCLUDE_FILE" \
         -p "run/archiso d 755 0 0" \
         -p "run/archiso/bootmnt d 755 0 0"; then
         echo "mksquashfs succeeded"
