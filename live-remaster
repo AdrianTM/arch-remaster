@@ -29,6 +29,9 @@ BACKUP_ORIG=
 SKIP_MD5=false
 CREATED_MP=false
 SAFETY_MARGIN_MIB=20
+BOOT_MP=
+OUTPUT_DIR=
+LEAVE_NEW_FILE=false
 
 # Check for non-elevated options first
 case "$1" in
@@ -72,6 +75,7 @@ cleanup() {
             echo "Failed to umount $BOOT_MP, skipping rm"
         fi
     fi
+    [ -n "$OUTPUT_DIR" ] && [ "$LEAVE_NEW_FILE" != true ] && rm -f "$OUTPUT_DIR/airootfs.sfs.new"
     rm -rf "/tmp/remaster.exclude"
 }
 trap cleanup EXIT
@@ -95,21 +99,6 @@ all_space() {
 # Function to get du size in MiB
 du_size() {
     du -sm "$1" 2>/dev/null | awk '{print int($1)}' || echo 0
-}
-
-# Function to get compression type of squashfs
-sqfs_comp_type() {
-    local file=$1
-    comp_num=$(dd if="$file" bs=1 skip=20 count=2 status=none 2>/dev/null | od -An -tu2)
-    case $comp_num in
-        1) echo gzip ;;
-        2) echo lzma ;;
-        3) echo lzo ;;
-        4) echo xz ;;
-        5) echo lz4 ;;
-        6) echo zstd ;;
-        *) echo unknown ;;
-    esac
 }
 
 # Function to remount a mount point read-write
@@ -330,12 +319,8 @@ main() {
             fi
         done
         if [ "$skip" = false ] && [ -d "/$dir_name" ]; then
-            # Special handling for /run - include archiso but exclude mounted bootmnt
-            if [ "$dir_name" = "run" ]; then
-                # Only count size of run/archiso, not the mount point
-                run_archiso_size=$(du_size "/run/archiso")
-                fs_new_size=$((fs_new_size + run_archiso_size))
-            else
+            # Skip /run: it is a tmpfs, so -one-file-system excludes it from the squashfs
+            if [ "$dir_name" != "run" ]; then
                 dir_size=$(du_size "/$dir_name")
                 fs_new_size=$((fs_new_size + dir_size))
             fi
@@ -406,6 +391,7 @@ main() {
         echo "Manual steps:"
         echo "  1) Replace $SQFILE_FULL with $new_file"
         echo "  2) Regenerate checksum: (cd $SQFILE_DIR && sha512sum airootfs.sfs > airootfs.sha512)"
+        LEAVE_NEW_FILE=true
         exit 0
     fi
 
