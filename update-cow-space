@@ -85,6 +85,23 @@ fi
 
 MOUNT_POINT=""
 CREATED_MP=false
+TMP_MOUNT=""
+
+cleanup() {
+    if [ "$CREATED_MP" = true ] && [ -n "$MOUNT_POINT" ]; then
+        if mountpoint -q "$MOUNT_POINT" 2>/dev/null; then
+            if umount "$MOUNT_POINT" 2>/dev/null; then
+                [ -n "$TMP_MOUNT" ] && [ -d "$TMP_MOUNT" ] && rmdir "$TMP_MOUNT" 2>/dev/null || true
+                echo "Unmounted and cleaned up temporary mount"
+            else
+                echo "Failed to unmount $MOUNT_POINT"
+            fi
+        elif [ -n "$TMP_MOUNT" ] && [ -d "$TMP_MOUNT" ]; then
+            rmdir "$TMP_MOUNT" 2>/dev/null || true
+        fi
+    fi
+}
+trap cleanup EXIT
 
 # Find the ESP partition (EFI System Partition) by label
 ESP_LABEL="LIVE-UEFI"
@@ -172,13 +189,3 @@ fi
 
 echo "Updated GRUB config with cow_spacesize=$COW_SIZE"
 echo "Reboot the USB to apply changes."
-
-# Cleanup if we mounted
-if [ "$CREATED_MP" = true ]; then
-    if umount "$MOUNT_POINT" 2>/dev/null; then
-        rmdir "$MOUNT_POINT"
-        echo "Unmounted and cleaned up temporary mount"
-    else
-        echo "Failed to unmount $MOUNT_POINT"
-    fi
-fi
